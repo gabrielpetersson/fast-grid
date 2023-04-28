@@ -1,6 +1,6 @@
 # fast-grid
 
-Try to make the FPS drop in the bottom right. If that is too hard, try x4 cpu slowdown in devtools. To see how smooth it is - filter while on auto scroll, which scrolls a full viewport every frame
+The most performant DOM-based grid. Has the least DOM mutations possible by reusing parts of DOM-tree, and has it's own event loop to prioritize tasks, in order to never drop a frame.
 
 ### Benchmarks on 1 million rows Air M2 (wip)
 - Scroll full viewport every frame:           60fps
