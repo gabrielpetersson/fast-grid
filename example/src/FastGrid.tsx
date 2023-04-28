@@ -95,7 +95,7 @@ export const FastGrid = () => {
   return (
     <>
       <h1 className="font-bold text-3xl self-center">
-        {"Worlds most performant DOM-based table"}
+        {"World's most performant DOM-based table"}
       </h1>
       <a
         className="self-center underline text-blue-600 hover:text-blue-800 mt-2"
