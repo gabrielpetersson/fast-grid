@@ -105,7 +105,7 @@ export const FastGrid = () => {
       </a>
       <div className="flex justify-center items-center h-8">
         {loadingRows ? (
-          <p className="self-center">{"Loading rows..."}</p>
+          <p className="self-center">{"Generating rows..."}</p>
         ) : null}
       </div>
       <div
