@@ -154,6 +154,17 @@ export const FastGrid = () => {
           >
             Auto filter
           </Checkbox>
+          <p
+            onClick={() => {
+              setIsAutoFilter(!(isAutoFilter && isAutoScroll));
+              setIsAutoScroll(!(isAutoFilter && isAutoScroll));
+            }}
+            className={
+              "text-gray-800 self-center cursor-pointer select-none hover:opacity-70"
+            }
+          >
+            {"← Turn on both!"}
+          </p>
         </div>
         <div className={"flex [&>*+*]:ml-3 ml-10"}>
           <select
