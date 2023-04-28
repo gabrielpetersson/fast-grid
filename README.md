@@ -2,10 +2,12 @@
 
 ### Capabilites
 - Render _any_ number of rows, you are only limited by RAM. 
-- Never drops a frame while scrolling or filtering, even with millions of rows
+- Instant results on filtering
+- 60 fps while cruising the scrollbar
+- Never drops a frame, even while filtering millions of rows
 
-### Technical specifications
-The most performant DOM-based grid.<br>
+### Technical details
+The most performant DOM-based grid.
 - Resuses parts of DOM-tree to reduce expensive DOM mutations.  
 - Own event loop to prioritize tasks. Never drops a frame
 - Non-passive scrolling. Rows will never be seen rows loading into the UI while scrolling
