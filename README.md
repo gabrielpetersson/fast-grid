@@ -1,4 +1,4 @@
-# fast-grid - [Try it!](fast-grid.vercel.app)
+# fast-grid - [Try it!](https://fast-grid.vercel.app)
 
 ### Capabilites
 - Render _any_ number of rows, you are only limited by RAM. 
