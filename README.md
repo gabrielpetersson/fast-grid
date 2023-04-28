@@ -7,13 +7,13 @@ Disclaimers:
 2) Can't filter/sort at the same time yet
 3) Sorting/reversing is blocking main thread atm
 
-## TODO features/performance
+### TODO features/performance
 - make a synthetic event-loop for prioritizing filter vs row rendering vs scrolling
 - scrolling one viewport every frame while filtering a million rows runs at 40fps (macbook air m2), figure out why
 - support filter + sort at same time
 - text selection - make sure ordering of rows is correct
 
-## TODO npm packaging
+### TODO npm packaging
 - break out filtering into own package
 - detach scrollbar from logic
 - clean up code/rename
