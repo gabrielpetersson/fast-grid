@@ -17,37 +17,37 @@ export class Scrollbar {
     this.transientScrollOffsetY = 0;
     this.transientScrollOffsetX = 0;
 
-    this.trackY = document.createElement("div");
-    this.trackY.className =
-      "absolute right-0 z-10 h-full w-[8px] cursor-pointer bg-gray-200";
-
-    this.thumbY = document.createElement("div");
-    this.thumbY.className =
-      "w-full cursor-pointer bg-gray-500 hover:bg-gray-400";
-
     this.trackX = document.createElement("div");
     this.trackX.className =
-      "absolute bottom-0 z-10 h-[8px] w-full cursor-pointer bg-gray-200";
+      "absolute bottom-0 z-10 h-[8px] w-full cursor-pointer bg-gray-100 border-t border-gray-300";
 
     this.thumbX = document.createElement("div");
     this.thumbX.className =
-      "h-full cursor-pointer bg-gray-500 hover:bg-gray-400";
+      "h-full cursor-pointer bg-gray-400 hover:opacity-90 rounded";
 
-    this.trackY.addEventListener("mousemove", this.onTrackMouseMoveY);
-    this.trackY.addEventListener("mousedown", this.onTrackMouseDownY);
+    this.trackY = document.createElement("div");
+    this.trackY.className =
+      "absolute right-0 z-10 h-full w-[8px] cursor-pointer bg-gray-100 border-l border-gray-300";
+
+    this.thumbY = document.createElement("div");
+    this.thumbY.className =
+      "w-full cursor-pointer bg-gray-400 hover:opacity-90 rounded";
 
     this.trackX.addEventListener("mousemove", this.onTrackMouseMoveX);
     this.trackX.addEventListener("mousedown", this.onTrackMouseDownX);
 
-    this.thumbY.addEventListener("mousedown", this.onThumbMouseDownY);
+    this.trackY.addEventListener("mousemove", this.onTrackMouseMoveY);
+    this.trackY.addEventListener("mousedown", this.onTrackMouseDownY);
+
     this.thumbX.addEventListener("mousedown", this.onThumbMouseDownX);
+    this.thumbY.addEventListener("mousedown", this.onThumbMouseDownY);
 
     this.grid.container.addEventListener("wheel", this.onContainerWheel);
 
-    this.trackY.appendChild(this.thumbY);
     this.trackX.appendChild(this.thumbX);
-    this.grid.container.appendChild(this.trackY);
+    this.trackY.appendChild(this.thumbY);
     this.grid.container.appendChild(this.trackX);
+    this.grid.container.appendChild(this.trackY);
 
     this.updateUi();
   }

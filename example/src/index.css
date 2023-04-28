@@ -11,6 +11,7 @@ body {
   max-height: 100vh;
 
   padding: 20px 50px 50px 50px;
+  font-family: "Open Sans", sans-serif;
 }
 
 #root {

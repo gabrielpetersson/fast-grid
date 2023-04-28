@@ -6,7 +6,11 @@ export default {
     "../src/**/*.{js,ts,jsx,tsx}", // obv fix this, should not use tailwind in package
   ],
   theme: {
-    extend: {},
+    extend: {
+      fontFamily: {
+        openSans: ["Open Sans", "sans-serif"],
+      },
+    },
   },
   plugins: [],
 };

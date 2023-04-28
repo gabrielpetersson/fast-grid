@@ -4,7 +4,7 @@ import { Row, RowComponent } from "./row";
 import { Scrollbar } from "./scrollbar";
 
 const ROW_HEIGHT = 32;
-
+const prevFilterMs: number[] = [];
 export class Grid {
   scrollOffsetY: number;
   scrollOffsetX: number;
@@ -103,6 +103,9 @@ export class Grid {
       requiredWidth,
       scrollXOffset,
       scrollThumbXSize,
+
+      rowsPerViewport,
+      cellsPerRow,
     };
   };
   setScrollOffsetX = (offset: number) => {
@@ -132,17 +135,24 @@ export class Grid {
       return;
     }
 
-    const ROW_CHUNK_SIZE = 1000;
+    const t0 = performance.now();
+    const metrics = this.getMetrics();
+
+    const ROW_CHUNK_SIZE = 500;
     const filteredRows: Row[] = [];
     const numChunks = Math.ceil(this.rows.length / ROW_CHUNK_SIZE);
 
     const filterId = this.currentFilterId + 1;
     this.currentFilterId = filterId;
 
+    let hasShownInitialResult = false;
     for (let chunkIndex = 0; chunkIndex < numChunks; chunkIndex++) {
       const startIndex = chunkIndex * ROW_CHUNK_SIZE;
       const endIndex = Math.min(startIndex + ROW_CHUNK_SIZE, this.rows.length);
 
+      if (this.shouldCancelFilter(filterId)) {
+        return;
+      }
       if (isTimeToYield("user-visible")) {
         await yieldControl("user-visible");
         if (this.shouldCancelFilter(filterId)) {
@@ -152,25 +162,37 @@ export class Grid {
 
       for (let i = startIndex; i < endIndex; i++) {
         const row = this.rows[i]!;
-        if (row.cells[1]!.value.includes(query)) {
+        // NOTE(gab): indexOf is faster than includes
+        if (row.cells[1]!.value.indexOf(query) > -1) {
           filteredRows.push(row);
         }
       }
 
+      // NOTE(gab): shows first results asap, but make sure they fill the viewport so rows are
+      // not loading in in batches
+      const showFirstResult =
+        !hasShownInitialResult &&
+        filteredRows.length > metrics.rowsPerViewport * 5;
       if (
-        chunkIndex % 200 === 0 ||
-        chunkIndex === 0 ||
+        chunkIndex % 300 === 0 ||
+        showFirstResult ||
         chunkIndex === numChunks - 1
       ) {
+        hasShownInitialResult = true;
         // experimental, sets the filtered results every batch.
         // will loose track of where you previously were, instantly gives results
         this.filteredRows = filteredRows;
         this.renderViewportRows();
         // hack for scrolling to closest non-filtered row
         this.scrollbar.setScrollOffsetY(this.scrollOffsetY);
-        this.scrollbar.updateUi();
+        // this.scrollbar.updateUi();
       }
     }
+    const ms = performance.now() - t0;
+    prevFilterMs.push(ms);
+    const avgFilterMs =
+      prevFilterMs.reduce((a, b) => a + b, 0) / prevFilterMs.length;
+    console.log(`Filtering took ${ms}. Avg: ${avgFilterMs}`);
   };
   setRows = (rows: Row[]) => {
     this.rows = rows;
