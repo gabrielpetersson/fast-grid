@@ -2,11 +2,13 @@
 
 The most performant DOM-based grid. Has the least DOM mutations possible by reusing parts of DOM-tree, and has it's own event loop to prioritize tasks, in order to never drop a frame.
 
-### Benchmarks on 1 million rows Air M2 (wip)
-- Scroll full viewport every frame:           60fps
-- Filtering:                                  110ms
-- Grid initialization and render:             1.5ms
-- Scroll + filter same time every 300ms:      45fps
+### One million rows benchmark (Air M2) 
+| Benchmark | Score |
+| --- | --- |
+| Scroll full viewport every frame | 60fps |
+| Filtering | 110ms |
+| Grid initialization and render: | 1.5ms |
+| Scroll + filter same time every 300ms: | 45fps |
 
 ### Disclaimers
 1) Number of rows is limited by memory only. See how many you can generate! (might make page crash)
