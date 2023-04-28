@@ -1,8 +1,17 @@
-# fast-grid - [Try it!](fast-grid.vercel.app)
+# fast-grid - [Try it!](https://fast-grid.vercel.app)
 
-The most performant DOM-based grid. Resuses parts of DOM-tree to reduce expensive DOM mutations, and has it's own event loop to prioritize tasks to never drop a frame. <br>
-It has a non-passive scroller, so rows will never be seen rows loading into the UI. <br>
-The virtualization and scrolling is custom built to get past browsers 15 million pixel div height limit.
+### Capabilites
+- Render _any_ number of rows, you are only limited by RAM. 
+- Instant results on filtering
+- 60 fps while cruising the scrollbar
+- Never drops a frame, even while filtering millions of rows
+
+### Technical details
+The most performant DOM-based grid.
+- Resuses parts of DOM-tree to reduce expensive DOM mutations.  
+- Own event loop to prioritize tasks. Never drops a frame
+- Non-passive scrolling. Rows will never be seen rows loading into the UI while scrolling
+- Custom virtualization and scrolling. Not limited by browsers 15 million pixel div height limit
 
 ### One million rows benchmark (Air M2) 
 | Benchmark | Score |
@@ -13,9 +22,7 @@ The virtualization and scrolling is custom built to get past browsers 15 million
 | Scroll 40 rows every frame + filter same time every 300ms | 45fps |
 
 ### Disclaimers
-1) Number of rows is limited by memory only. See how many you can generate! (might make page crash)
-2) Can't filter/sort at the same time yet
-3) Sorting/reversing is blocking main thread atm
+In the example, sorting is still blocking main thread, meaning it drops frames. Adding to the custom event loop soon
 
 ### TODO features/performance
 - make a synthetic event-loop for prioritizing filter vs row rendering vs scrolling
