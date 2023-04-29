@@ -2,9 +2,8 @@
 
 ### Capabilites
 - Render _any_ number of rows, you are only limited by RAM. 
-- Instant results on filtering
+- Instant results on filtering millions of rows
 - 60 fps while cruising the scrollbar
-- Never drops a frame, even while filtering millions of rows
 
 ### Technical details
 The most performant DOM-based grid.
@@ -25,10 +24,10 @@ The most performant DOM-based grid.
 In the example, sorting is still blocking main thread, meaning it drops frames. Adding to the custom event loop soon
 
 ### TODO features/performance
-- make a synthetic event-loop for prioritizing filter vs row rendering vs scrolling
+- expand synthetic event-loop to include scrolling & rendering cell contents
 - scrolling one viewport every frame while filtering a million rows runs at 40fps (macbook air m2), figure out why
 - support filter + sort at same time
-- text selection - make sure ordering of rows is correct
+- text selection - make sure ordering of rows in the DOM is correct
 - chunk up sorting so it's not blocking main thread
 
 ### TODO npm packaging
