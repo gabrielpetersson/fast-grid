@@ -68,10 +68,13 @@ export class Grid {
       Math.min(scrollThumbYPct * viewportHeight, viewportHeight),
       30
     );
-
-    const thumbOffsetY =
-      (this.offsetY / scrollableHeight) * viewportHeight -
-      thumbSizeY * (this.offsetY / scrollableHeight);
+    const thumbOffsetY = (() => {
+      if (scrollableHeight === 0) return 0;
+      return (
+        (this.offsetY / scrollableHeight) * viewportHeight -
+        thumbSizeY * (this.offsetY / scrollableHeight)
+      );
+    })();
 
     const scrollableWidth = Math.max(requiredWidth - viewportWidth, 0);
     const scrollThumbXPct = viewportWidth / requiredWidth;
@@ -146,11 +149,13 @@ export class Grid {
       const endIndex = Math.min(startIndex + ROW_CHUNK_SIZE, this.rows.length);
 
       if (this.shouldCancelFilter(filterId)) {
+        this.scrollbar.refreshThumb();
         return;
       }
       if (isTimeToYield("user-visible")) {
         await yieldControl("user-visible");
         if (this.shouldCancelFilter(filterId)) {
+          this.scrollbar.refreshThumb();
           return;
         }
       }
@@ -165,22 +170,21 @@ export class Grid {
 
       // NOTE(gab): shows first results asap, but make sure they fill the viewport so rows are
       // not loading in in batches
-      const showFirstResult =
-        !hasShownInitialResult &&
-        filteredRows.length > metrics.rowsPerViewport * 5;
-      if (
-        chunkIndex % 1000 === 0 ||
-        showFirstResult ||
-        chunkIndex === numChunks - 1
-      ) {
+      const fillsViewport = filteredRows.length > metrics.rowsPerViewport;
+      const showFirstResult = !hasShownInitialResult;
+      const showEarlyResults = chunkIndex % 1000 === 0 || showFirstResult;
+      if (showEarlyResults && fillsViewport) {
         hasShownInitialResult = true;
         this.filteredRows = filteredRows;
 
         // clamps offset into viewport, if rows are filtered away
-        this.scrollbar.setScrollOffsetY(this.offsetY);
         this.renderViewportRows();
+        this.scrollbar.setScrollOffsetY(this.offsetY);
       }
       // NOTE(gab): refresh size of thumb after we are completely done, to prevent jumping
+      this.filteredRows = filteredRows;
+      this.renderViewportRows();
+      this.scrollbar.setScrollOffsetY(this.offsetY);
       this.scrollbar.refreshThumb();
     }
     const ms = performance.now() - t0;
@@ -258,6 +262,21 @@ export class Grid {
     for (const rowComponent of removeRowComponents) {
       rowComponent.destroy();
       delete this.rowComponentMap[rowComponent.rowState.key];
+    }
+  };
+  renderViewportCells = () => {
+    const metrics = this.getMetrics();
+
+    for (let i = metrics.startRow; i < metrics.endRow; i++) {
+      const row = this.getRows()[i]!;
+      if (row == null) {
+        continue;
+      }
+      const existing = this.rowComponentMap[row.key];
+      if (existing == null) {
+        throw new Error("should exist");
+      }
+      existing.renderCells();
     }
   };
 }
