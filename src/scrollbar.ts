@@ -49,38 +49,41 @@ export class Scrollbar {
     this.grid.container.appendChild(this.trackX);
     this.grid.container.appendChild(this.trackY);
 
-    this.updateUi();
+    this.refreshThumb();
   }
-  updateUi = () => {
+  refreshThumb = () => {
     const metrics = this.grid.getMetrics();
-    this.setOffsetY(metrics.scrollYOffset);
-    this.setThumbSizeY(metrics.scrollThumbYSize);
-    this.setOffsetX(metrics.scrollXOffset);
-    this.setThumbSizeX(metrics.scrollThumbXSize);
+    this.translateThumbY(metrics.thumbOffsetY);
+    this.setThumbSizeY(metrics.thumbSizeY);
+    this.translateThumbX(metrics.thumbOffsetX);
+    this.setThumbSizeX(metrics.thumbSizeX);
   };
   setScrollOffsetY = (offset: number) => {
     const metrics = this.grid.getMetrics();
-    const newOffset2 = Math.max(0, Math.min(offset, metrics.missingHeight));
-    this.grid.scrollOffsetY = newOffset2;
+    const clampedOffset = Math.max(
+      0,
+      Math.min(offset, metrics.scrollableHeight)
+    );
+    this.grid.offsetY = clampedOffset;
     const metrics2 = this.grid.getMetrics();
-    this.setOffsetY(metrics2.scrollYOffset);
-    this.grid.renderViewportRows();
+    this.translateThumbY(metrics2.thumbOffsetY);
   };
   setScrollOffsetX = (offset: number) => {
     const metrics = this.grid.getMetrics();
-    const newOffset2 = Math.max(0, Math.min(offset, metrics.missingWidth));
-    this.grid.scrollOffsetX = newOffset2;
+    const newOffset2 = Math.max(0, Math.min(offset, metrics.scrollableWidth));
+    this.grid.offsetX = newOffset2;
     const metrics2 = this.grid.getMetrics();
-    this.setOffsetX(metrics2.scrollXOffset);
-    this.grid.renderViewportCells();
+    this.translateThumbX(metrics2.thumbOffsetX);
   };
   scrollByY = (offset: number) => {
-    const newOffset = this.grid.scrollOffsetY + offset;
+    const newOffset = this.grid.offsetY + offset;
     this.setScrollOffsetY(newOffset);
+    this.grid.renderViewportRows();
   };
   scrollByX = (offset: number) => {
-    const newOffset = this.grid.scrollOffsetX + offset;
+    const newOffset = this.grid.offsetX + offset;
     this.setScrollOffsetX(newOffset);
+    this.grid.renderViewportRows();
   };
   onContainerWheel = (e: WheelEvent) => {
     e.preventDefault();
@@ -203,6 +206,7 @@ export class Scrollbar {
     const relativeOffset =
       (e.offsetY / metrics.viewportHeight) * metrics.requiredHeight;
     this.setScrollOffsetY(relativeOffset);
+    this.grid.renderViewportRows();
   };
   onTrackMouseDownX = (e: MouseEvent) => {
     e.preventDefault();
@@ -210,11 +214,12 @@ export class Scrollbar {
     const relativeOffset =
       (e.offsetX / metrics.viewportWidth) * metrics.requiredWidth;
     this.setScrollOffsetX(relativeOffset);
+    this.grid.renderViewportRows();
   };
-  setOffsetY = (offset: number) => {
+  translateThumbY = (offset: number) => {
     this.thumbY.style.transform = `translateY(${offset}px)`;
   };
-  setOffsetX = (offset: number) => {
+  translateThumbX = (offset: number) => {
     this.thumbX.style.transform = `translateX(${offset}px)`;
   };
   setThumbSizeY = (height: number) => {

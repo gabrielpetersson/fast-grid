@@ -6,8 +6,8 @@ import { Scrollbar } from "./scrollbar";
 const ROW_HEIGHT = 32;
 const prevFilterMs: number[] = [];
 export class Grid {
-  scrollOffsetY: number;
-  scrollOffsetX: number;
+  offsetY: number;
+  offsetX: number;
   rows: Row[];
 
   windowHeight: number;
@@ -23,8 +23,8 @@ export class Grid {
     this.currentFilterId = 0;
     this.filteredRows = null;
 
-    this.scrollOffsetY = 0;
-    this.scrollOffsetX = 0;
+    this.offsetY = 0;
+    this.offsetX = 0;
     this.rows = rows;
     this.container = container;
     this.rowComponentMap = {};
@@ -48,40 +48,44 @@ export class Grid {
     const requiredWidth = Math.max(numCells * CELL_WIDTH ?? 0, viewportWidth);
 
     const viewportHeight = this.container.clientHeight;
-    // NOTE(gab): full viewport + 1 row above and one under
+    // NOTE(gab): full viewport, and an additional row top and bottom to simulate scrolling
     const rowsPerViewport = Math.floor(viewportHeight / ROW_HEIGHT) + 2;
 
     const requiredHeight = Math.max(rows.length * ROW_HEIGHT, viewportHeight);
 
-    const startCell = Math.floor(this.scrollOffsetX / CELL_WIDTH);
+    const startCell = Math.floor(this.offsetX / CELL_WIDTH);
     const endCell = Math.min(startCell + cellsPerRow, numCells);
-    const cellOffset = -Math.floor(this.scrollOffsetX % CELL_WIDTH);
+    const cellOffset = -Math.floor(this.offsetX % CELL_WIDTH);
 
-    const startRow = Math.floor(this.scrollOffsetY / ROW_HEIGHT);
+    // NOTE(gab): start to end of rows to render, along with the row offset to simulate scrolling
+    const startRow = Math.floor(this.offsetY / ROW_HEIGHT);
     const endRow = Math.min(startRow + rowsPerViewport, rows.length);
-    const rowOffset = -Math.floor(this.scrollOffsetY % ROW_HEIGHT);
+    const rowOffset = -Math.floor(this.offsetY % ROW_HEIGHT);
 
-    const missingHeight = requiredHeight - viewportHeight;
+    const scrollableHeight = requiredHeight - viewportHeight;
     const scrollThumbYPct =
-      missingHeight === 0 ? 1 : viewportHeight / missingHeight;
-    const scrollThumbYSize = Math.max(
+      scrollableHeight === 0 ? 1 : viewportHeight / scrollableHeight;
+    // console.count("getMetrics");
+    // console.log("vh", viewportHeight);
+    // console.log("px", scrollThumbYPct * viewportHeight, "pct", scrollThumbYPct);
+    const thumbSizeY = Math.max(
       Math.min(scrollThumbYPct * viewportHeight, viewportHeight),
       30
     );
-    // TODO(gab): JESUS CHRIST fix naming
-    const scrollYOffset =
-      (this.scrollOffsetY / missingHeight) * viewportHeight -
-      scrollThumbYSize * (this.scrollOffsetY / missingHeight);
 
-    const missingWidth = Math.max(requiredWidth - viewportWidth, 0);
+    const thumbOffsetY =
+      (this.offsetY / scrollableHeight) * viewportHeight -
+      thumbSizeY * (this.offsetY / scrollableHeight);
+
+    const scrollableWidth = Math.max(requiredWidth - viewportWidth, 0);
     const scrollThumbXPct = viewportWidth / requiredWidth;
-    const scrollThumbXSize = Math.max(
+    const thumbSizeX = Math.max(
       Math.min(scrollThumbXPct * viewportWidth, viewportWidth),
       30
     );
-    const scrollXOffset =
-      (this.scrollOffsetX / missingWidth) * viewportWidth -
-      scrollThumbXSize * (this.scrollOffsetX / missingWidth);
+    const thumbOffsetX =
+      (this.offsetX / scrollableWidth) * viewportWidth -
+      thumbSizeX * (this.offsetX / scrollableWidth);
     return {
       endRow,
       startRow,
@@ -94,29 +98,24 @@ export class Grid {
       viewportWidth,
       viewportHeight,
 
-      missingHeight,
+      scrollableHeight,
       requiredHeight,
-      scrollYOffset,
-      scrollThumbYSize,
+      thumbOffsetY,
+      thumbSizeY,
 
-      missingWidth,
+      scrollableWidth,
       requiredWidth,
-      scrollXOffset,
-      scrollThumbXSize,
+      thumbOffsetX,
+      thumbSizeX,
 
       rowsPerViewport,
       cellsPerRow,
     };
   };
-  setScrollOffsetX = (offset: number) => {
-    this.scrollOffsetX = offset;
-    const metrics = this.getMetrics();
-    this.scrollbar.setOffsetY(metrics.scrollYOffset);
-    this.renderViewportRows();
-  };
   scrollToBottom = () => {
     const metrics = this.getMetrics();
-    this.scrollbar.setScrollOffsetY(metrics.missingHeight);
+    this.scrollbar.setScrollOffsetY(metrics.scrollableHeight);
+    this.renderViewportRows();
   };
   getRows = () => {
     if (this.filteredRows != null) {
@@ -174,19 +173,19 @@ export class Grid {
         !hasShownInitialResult &&
         filteredRows.length > metrics.rowsPerViewport * 5;
       if (
-        chunkIndex % 300 === 0 ||
+        chunkIndex % 1000 === 0 ||
         showFirstResult ||
         chunkIndex === numChunks - 1
       ) {
         hasShownInitialResult = true;
-        // experimental, sets the filtered results every batch.
-        // will loose track of where you previously were, instantly gives results
         this.filteredRows = filteredRows;
+
+        // clamps offset into viewport
+        this.scrollbar.setScrollOffsetY(this.offsetY);
         this.renderViewportRows();
-        // hack for scrolling to closest non-filtered row
-        this.scrollbar.setScrollOffsetY(this.scrollOffsetY);
-        // this.scrollbar.updateUi();
       }
+      // NOTE(gab): refresh size of thumb after we are completely done, to prevent jumping
+      this.scrollbar.refreshThumb();
     }
     const ms = performance.now() - t0;
     prevFilterMs.push(ms);
@@ -197,9 +196,9 @@ export class Grid {
   setRows = (rows: Row[]) => {
     this.rows = rows;
     this.filteredRows = null;
-    this.scrollbar.setScrollOffsetY(this.scrollOffsetY);
-    this.scrollbar.updateUi();
+    this.scrollbar.setScrollOffsetY(this.offsetY);
     this.renderViewportRows();
+    this.scrollbar.refreshThumb();
   };
   // TODO(gab): make readable
   renderViewportRows = () => {
@@ -263,21 +262,6 @@ export class Grid {
     for (const rowComponent of removeRowComponents) {
       rowComponent.destroy();
       delete this.rowComponentMap[rowComponent.rowState.key];
-    }
-  };
-  renderViewportCells = () => {
-    const metrics = this.getMetrics();
-
-    for (let i = metrics.startRow; i < metrics.endRow; i++) {
-      const row = this.getRows()[i]!;
-      if (row == null) {
-        continue;
-      }
-      const existing = this.rowComponentMap[row.key];
-      if (existing == null) {
-        throw new Error("should exist");
-      }
-      existing.renderCells();
     }
   };
 }

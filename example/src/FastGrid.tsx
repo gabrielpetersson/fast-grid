@@ -39,7 +39,7 @@ export const FastGrid = () => {
     if (grid == null || !isAutoFilter) return;
     const id = setInterval(() => {
       setFilterQuery((p) => {
-        if (p.length >= 4) {
+        if (p.length >= 5) {
           return "";
         }
         return p + Math.floor(Math.random() * 10);
@@ -51,14 +51,19 @@ export const FastGrid = () => {
   useEffect(() => {
     if (grid == null) return;
     setLoadingRows(true);
+    setFilterQuery("");
     generateRows(rowCount, grid, () => setLoadingRows(false));
   }, [rowCount, grid]);
+
+  useEffect(() => {
+    if (autoScroller == null) return;
+    isAutoScroll ? autoScroller.start() : autoScroller.stop();
+  }, [autoScroller, isAutoScroll]);
 
   const addRow = () => {
     if (grid == null) return;
     const row = generateRow(grid.rows.length);
     grid.rows.push(row);
-    grid.renderViewportRows();
     grid.scrollToBottom();
   };
 
@@ -79,11 +84,6 @@ export const FastGrid = () => {
     setSortToggle((p) => !p);
   };
 
-  useEffect(() => {
-    if (autoScroller == null) return;
-    isAutoScroll ? autoScroller.start() : autoScroller.stop();
-  }, [autoScroller, isAutoScroll]);
-
   const reset = () => {
     if (grid == null) return;
     setFilterQuery("");
@@ -92,6 +92,7 @@ export const FastGrid = () => {
     setIsAutoScroll(false);
     generateRows(rowCount, grid, () => setLoadingRows(false));
   };
+
   return (
     <>
       <h1 className="font-bold text-3xl self-center">
@@ -252,12 +253,20 @@ const Checkbox: FC<CheckboxProps> = ({ children, active, onClick }) => {
   );
 };
 
+function skewedRandom() {
+  const a = Math.pow(Math.random(), 2);
+  if (Math.random() < 0.5) {
+    return a;
+  }
+  return 1 - a;
+}
+
 const generateRow = (i: number): Row => {
   const cells: Cell[] = [
     { type: "string", value: String(i + 1), key: `${i}-index`, s: i },
   ];
   for (let j = 0; j < N_COLS; j++) {
-    const v = Math.round(Math.random() * 100000000);
+    const v = Math.round(skewedRandom() * 100000000);
     cells[j + 1]! = {
       type: "string",
       value: String(v),
@@ -317,11 +326,11 @@ class AutoScroller {
       }
 
       if (
-        this.grid.scrollOffsetY >
-        metrics.requiredHeight - metrics.viewportHeight - 100
+        this.grid.offsetY >
+        metrics.requiredHeight - metrics.viewportHeight - 1
       ) {
         this.toBottom = false;
-      } else if (this.grid.scrollOffsetY < 100) {
+      } else if (this.grid.offsetY <= 0) {
         this.toBottom = true;
       }
 
