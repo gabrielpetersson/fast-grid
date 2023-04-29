@@ -254,7 +254,7 @@ const Checkbox: FC<CheckboxProps> = ({ children, active, onClick }) => {
 
 const generateRow = (i: number): Row => {
   const cells: Cell[] = [
-    { type: "string", value: String(i), key: `${i}-index`, s: i },
+    { type: "string", value: String(i + 1), key: `${i}-index`, s: i },
   ];
   for (let j = 0; j < N_COLS; j++) {
     const v = Math.round(Math.random() * 100000000);
@@ -262,7 +262,7 @@ const generateRow = (i: number): Row => {
       type: "string",
       value: String(v),
       key: `${i}-${j}`,
-      s: v, // just a hack for now
+      s: v, // TODO(gab): rm field, sorting on this for efficiency. will fix with separate number/string cells
     };
   }
   return { key: String(i), cells };

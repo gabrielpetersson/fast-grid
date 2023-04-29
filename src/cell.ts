@@ -1,5 +1,6 @@
 import { RowComponent } from "./row";
 
+// TODO(gab): make this a setting
 export const CELL_WIDTH = 130;
 
 export interface Cell {
