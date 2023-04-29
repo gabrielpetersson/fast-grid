@@ -70,8 +70,11 @@ export class Scrollbar {
   };
   setScrollOffsetX = (offset: number) => {
     const metrics = this.grid.getMetrics();
-    const newOffset2 = Math.max(0, Math.min(offset, metrics.scrollableWidth));
-    this.grid.offsetX = newOffset2;
+    const clampedOffset = Math.max(
+      0,
+      Math.min(offset, metrics.scrollableWidth)
+    );
+    this.grid.offsetX = clampedOffset;
     const metrics2 = this.grid.getMetrics();
     this.translateThumbX(metrics2.thumbOffsetX);
   };
@@ -190,7 +193,7 @@ export class Scrollbar {
     this.isScrolling = false;
     // NOTE(gab): makes sure the last cancelled scroll events are applied, if any
     if (this.transientScrollOffsetX !== 0) {
-      this.scrollByY(this.transientScrollOffsetX);
+      this.scrollByX(this.transientScrollOffsetX);
     }
     this.transientScrollOffsetX = 0;
   };

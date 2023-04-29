@@ -63,11 +63,7 @@ export class Grid {
     const rowOffset = -Math.floor(this.offsetY % ROW_HEIGHT);
 
     const scrollableHeight = requiredHeight - viewportHeight;
-    const scrollThumbYPct =
-      scrollableHeight === 0 ? 1 : viewportHeight / scrollableHeight;
-    // console.count("getMetrics");
-    // console.log("vh", viewportHeight);
-    // console.log("px", scrollThumbYPct * viewportHeight, "pct", scrollThumbYPct);
+    const scrollThumbYPct = viewportHeight / requiredHeight;
     const thumbSizeY = Math.max(
       Math.min(scrollThumbYPct * viewportHeight, viewportHeight),
       30
@@ -180,7 +176,7 @@ export class Grid {
         hasShownInitialResult = true;
         this.filteredRows = filteredRows;
 
-        // clamps offset into viewport
+        // clamps offset into viewport, if rows are filtered away
         this.scrollbar.setScrollOffsetY(this.offsetY);
         this.renderViewportRows();
       }
