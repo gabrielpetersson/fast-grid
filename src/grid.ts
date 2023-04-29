@@ -143,7 +143,7 @@ export class Grid {
     const filterId = this.currentFilterId + 1;
     this.currentFilterId = filterId;
 
-    let hasShownInitialResult = false;
+    let hasShownFirstResult = false;
     for (let chunkIndex = 0; chunkIndex < numChunks; chunkIndex++) {
       const startIndex = chunkIndex * ROW_CHUNK_SIZE;
       const endIndex = Math.min(startIndex + ROW_CHUNK_SIZE, this.rows.length);
@@ -152,6 +152,7 @@ export class Grid {
         this.scrollbar.refreshThumb();
         return;
       }
+      // NOTE(gab): this is the magic - run work sync is possible, awaits if main thread busy
       if (isTimeToYield("user-visible")) {
         await yieldControl("user-visible");
         if (this.shouldCancelFilter(filterId)) {
@@ -171,22 +172,21 @@ export class Grid {
       // NOTE(gab): shows first results asap, but make sure they fill the viewport so rows are
       // not loading in in batches
       const fillsViewport = filteredRows.length > metrics.rowsPerViewport;
-      const showFirstResult = !hasShownInitialResult;
-      const showEarlyResults = chunkIndex % 1000 === 0 || showFirstResult;
+      const showEarlyResults = chunkIndex % 100 === 0 || !hasShownFirstResult;
       if (showEarlyResults && fillsViewport) {
-        hasShownInitialResult = true;
+        hasShownFirstResult = true;
         this.filteredRows = filteredRows;
-
-        // clamps offset into viewport, if rows are filtered away
         this.renderViewportRows();
+        // NOTE(gab): clamps offset into viewport, if rows are filtered away
         this.scrollbar.setScrollOffsetY(this.offsetY);
       }
-      // NOTE(gab): refresh size of thumb after we are completely done, to prevent jumping
-      this.filteredRows = filteredRows;
-      this.renderViewportRows();
-      this.scrollbar.setScrollOffsetY(this.offsetY);
-      this.scrollbar.refreshThumb();
     }
+    this.filteredRows = filteredRows;
+    this.renderViewportRows();
+    this.scrollbar.setScrollOffsetY(this.offsetY);
+    // NOTE(gab): refresh size of thumb after completely done filtering, to prevent jumping of size
+    this.scrollbar.refreshThumb();
+
     const ms = performance.now() - t0;
     prevFilterMs.push(ms);
     const avgFilterMs =
@@ -203,7 +203,6 @@ export class Grid {
   // TODO(gab): make readable
   renderViewportRows = () => {
     const metrics = this.getMetrics();
-
     const rows = this.getRows();
     const renderedRowMap: Record<string, true> = {};
     for (let i = metrics.startRow; i < metrics.endRow; i++) {
@@ -224,15 +223,15 @@ export class Grid {
     }
 
     for (let i = metrics.startRow; i < metrics.endRow; i++) {
-      const row = rows[i]!;
-      const offset = metrics.rowOffset + (i - metrics.startRow) * ROW_HEIGHT;
-
+      const row = rows[i];
       if (row == null) {
         continue;
       }
-      const existing = this.rowComponentMap[row.key];
-      if (existing != null) {
-        existing.setOffset(offset);
+
+      const offset = metrics.rowOffset + (i - metrics.startRow) * ROW_HEIGHT;
+      const existingRowComponent = this.rowComponentMap[row.key];
+      if (existingRowComponent != null) {
+        existingRowComponent.setOffset(offset);
         continue;
       }
 
@@ -266,17 +265,14 @@ export class Grid {
   };
   renderViewportCells = () => {
     const metrics = this.getMetrics();
-
+    const rows = this.getRows();
     for (let i = metrics.startRow; i < metrics.endRow; i++) {
-      const row = this.getRows()[i]!;
-      if (row == null) {
-        continue;
-      }
-      const existing = this.rowComponentMap[row.key];
-      if (existing == null) {
+      const row = rows[i]!;
+      const rowComponent = this.rowComponentMap[row.key];
+      if (rowComponent == null) {
         throw new Error("should exist");
       }
-      existing.renderCells();
+      rowComponent.renderCells();
     }
   };
 }
