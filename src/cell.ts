@@ -74,6 +74,11 @@ export class CellComponent {
   destroy() {
     // NOTE(gab): can speed be improved?
     // https://github.com/brianmhunt/knockout-fast-foreach/issues/37
-    this.rowComponent.el.removeChild(this.el);
+    // TODO(gab): should not need this, but crashes on my other computer otherwise. check
+    if (this.rowComponent.el.contains(this.el)) {
+      this.rowComponent.el.removeChild(this.el);
+    } else {
+      console.error("cell component already removed");
+    }
   }
 }

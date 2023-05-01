@@ -34,7 +34,12 @@ export class RowComponent {
   destroy() {
     // TODO(gab): can speed be improved?
     // https://github.com/brianmhunt/knockout-fast-foreach/issues/37
-    this.grid.container.removeChild(this.el);
+    // TODO(gab): should not need this, but crashes on my other computer otherwise. check
+    if (this.grid.container.contains(this.el)) {
+      this.grid.container.removeChild(this.el);
+    } else {
+      console.error("row component already removed");
+    }
   }
   setOffset(offset: number) {
     this.el.style.transform = `translateY(${offset}px)`;
