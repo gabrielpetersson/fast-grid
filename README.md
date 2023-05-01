@@ -18,7 +18,7 @@ The most performant DOM-based grid.
 | --- | --- |
 | Scroll 40 rows every frame | 60fps |
 | Filtering | 110ms |
-| Time to initialize and show rows | 1.5ms |
+| Time to initialize grid and show rows | 1.5ms |
 | Scroll 40 rows every frame + filter same time every 300ms | 45fps |
 
 ### Need an even more performant table?
