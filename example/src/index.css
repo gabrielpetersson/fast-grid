@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
+* {
+  box-sizing: border-box;
+}
 body {
   display: flex;
 
@@ -10,8 +13,9 @@ body {
   max-width: 100vw;
   max-height: 100vh;
 
-  padding: 20px 50px 50px 50px;
   font-family: "Open Sans", sans-serif;
+  padding: 10px 20px 20px 20px;
+  overflow: hidden;
 }
 
 #root {
@@ -20,4 +24,10 @@ body {
   flex-direction: column;
   justify-content: center;
   align-items: flex-start;
+}
+
+@media (min-width: 768px) {
+  body {
+    padding: 20px;
+  }
 }

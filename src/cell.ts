@@ -48,9 +48,11 @@ export class CellComponent {
   content: EnumCell | StringCell;
   rowComponent: RowComponent;
   value: Cell;
-  constructor(rowComponent: RowComponent, value: Cell) {
+  index: number;
+  constructor(rowComponent: RowComponent, value: Cell, index: number) {
     this.rowComponent = rowComponent;
     this.value = value;
+    this.index = index;
 
     this.el = document.createElement("div");
     // NOTE(gab): can fonts be optimized? testing to render a cursive text with subpixel antialiasing, vs
@@ -63,9 +65,10 @@ export class CellComponent {
 
     this.content = new StringCell(this);
   }
-  setValue(value: Cell) {
+  setValue(value: Cell, index: number) {
     // TODO(gab): what is this weird state management
     this.value = value;
+    this.index = index;
     this.content.setValue(value.value);
   }
   setOffset(offset: number) {
