@@ -1,4 +1,11 @@
-import { useState, useRef, useEffect, FC } from "react";
+import {
+  useState,
+  useRef,
+  useEffect,
+  FC,
+  SetStateAction,
+  Dispatch,
+} from "react";
 import { Cell, Grid, Row } from "grid";
 import Stats from "stats.js";
 import clsx from "clsx";
@@ -95,110 +102,70 @@ export const FastGrid = () => {
 
   return (
     <>
-      <h1 className="font-bold text-3xl self-center">
+      <h1 className="self-start text-xl font-bold lg:self-center lg:text-3xl">
         {"World's most performant DOM-based table"}
       </h1>
       <a
-        className="self-center underline text-blue-600 hover:text-blue-800 mt-2"
+        className="self-start text-sm text-blue-600 underline hover:text-blue-800 lg:mt-2 lg:self-center"
         href="https://github.com/gabrielpetersson/fast-grid/"
       >
         {"https://github.com/gabrielpetersson/fast-grid/"}
       </a>
-      <div className="flex justify-center items-center h-8">
-        {loadingRows ? (
-          <p className="self-center">{"Generating rows..."}</p>
-        ) : null}
+      <div className="flex h-6 items-center justify-center pt-1 text-[11px] leading-3 text-gray-800 lg:h-8 lg:pt-2">
+        {isAutoFilter && isAutoScroll
+          ? `The grid is now filtering ${rowCount
+              .toLocaleString("en-US", {
+                minimumFractionDigits: 0,
+                useGrouping: true,
+                currencyDisplay: "narrowSymbol",
+                currency: "USD",
+              })
+              .replace(
+                /,/g,
+                " "
+              )} rows every 300ms, while scrolling a full viewport every frame (16ms)`
+          : null}
+        {loadingRows ? "Generating rows..." : null}
       </div>
       <div
         className={clsx(
-          "text-white text-sm flex justify-between h-[50px] py-2 w-full",
-          loadingRows && "opacity-60 select-none pointer-events-none"
+          box,
+          "mt-2 flex h-[30px] w-full cursor-pointer select-none items-center justify-center rounded border border-gray-600 bg-blue-500 text-white hover:opacity-95 active:opacity-90 lg:hidden"
         )}
+        onClick={() => {
+          setIsAutoFilter(!(isAutoFilter && isAutoScroll));
+          setIsAutoScroll(!(isAutoFilter && isAutoScroll));
+        }}
       >
-        <div className={"flex [&>*+*]:ml-3"}>
-          <Button
-            disabled={filterQuery !== "" || isAutoFilter}
-            onClick={addRow}
-          >
-            Add row
-          </Button>
-          <Button
-            disabled={filterQuery !== "" || isAutoFilter}
-            onClick={reverseRows}
-          >
-            Reverse rows
-          </Button>
-          <Button
-            disabled={filterQuery !== "" || isAutoFilter}
-            onClick={sortSecondColumn}
-          >
-            Sort second column
-          </Button>
-          <input
-            value={filterQuery}
-            placeholder="Filter second column..."
-            onChange={(e) => setFilterQuery(e.target.value)}
-            className={clsx(
-              "pl-1 flex h-full w-[180px] items-center justify-center rounded bg-white text-gray-800 border-gray-800 border",
-              box
-            )}
-          />
-          <Checkbox
-            active={isAutoScroll}
-            onClick={() => setIsAutoScroll((p) => !p)}
-          >
-            Auto scroll
-          </Checkbox>
-          <Checkbox
-            active={isAutoFilter}
-            onClick={() => setIsAutoFilter((p) => !p)}
-          >
-            Auto filter
-          </Checkbox>
-          <p
-            onClick={() => {
-              setIsAutoFilter(!(isAutoFilter && isAutoScroll));
-              setIsAutoScroll(!(isAutoFilter && isAutoScroll));
-            }}
-            className={
-              "text-gray-800 self-center cursor-pointer select-none hover:opacity-70"
-            }
-          >
-            {"← Turn on both!"}
-          </p>
-        </div>
-        <div className={"flex [&>*+*]:ml-3 ml-10"}>
-          <select
-            name="exampleDropdown"
-            value={rowCount}
-            onChange={(e) => setRowCount(Number(e.target.value))}
-            className={clsx(
-              "pl-1 flex h-full w-[150px] items-center justify-center rounded bg-white text-gray-700 border-gray-800 border",
-              box
-            )}
-          >
-            <option value={10_000}>10 000 rows</option>
-            <option value={100_000}>100 000 rows</option>
-            <option value={500_000}>500 000 rows</option>
-            <option value={1_000_000}>
-              1 000 000 rows (might run out of ram)
-            </option>
-            <option value={2_000_000}>
-              2 000 000 rows (might run out of ram)
-            </option>
-            <option value={5_000_000}>
-              5 000 000 rows (might run out of ram)
-            </option>
-            <option value={10_000_000}>
-              10 000 000 rows (might run out of ram)
-            </option>
-          </select>
-          <Button onClick={reset}>Reset</Button>
-        </div>
+        Press here to max out the grid
       </div>
       <div
-        ref={containerRef}
-        className="relative box-border border border-gray-700 overflow-clip bg-white w-full h-full"
+        className={clsx(
+          "flex w-full select-none flex-wrap justify-between gap-2 py-2 text-[11px] text-white lg:[&>*:not(.gutter)]:flex-none [&>*]:h-[25px] [&>*]:min-w-[120px] [&>*]:flex-1 lg:[&>*]:h-[30px] lg:[&>*]:min-w-0",
+          loadingRows && "pointer-events-none select-none opacity-60"
+        )}
+      >
+        <PrimaryButtons
+          filterQuery={filterQuery}
+          isAutoFilter={isAutoFilter}
+          isAutoScroll={isAutoScroll}
+          addRow={addRow}
+          reverseRows={reverseRows}
+          setFilterQuery={setFilterQuery}
+          setIsAutoScroll={setIsAutoScroll}
+          setIsAutoFilter={setIsAutoFilter}
+          sortSecondColumn={sortSecondColumn}
+        />
+        <div className="gutter hidden flex-1 lg:block" />
+        <SecondaryButtons
+          rowCount={rowCount}
+          reset={reset}
+          setRowCount={setRowCount}
+        />
+      </div>
+      <div
+        ref={containerRef} // attaching grid here
+        className="relative box-border w-full flex-1 overflow-clip border border-gray-700 bg-white"
       ></div>
     </>
   );
@@ -216,13 +183,128 @@ const Button: FC<ButtonProps> = ({ disabled, children, onClick }) => {
     <div
       onClick={onClick}
       className={clsx(
-        "flex h-full w-[180px] cursor-pointer border border-gray-600 select-none items-center justify-center rounded bg-blue-500 hover:opacity-95 active:opacity-90",
+        "flex h-full w-[150px] cursor-pointer select-none items-center justify-center rounded border border-gray-600 bg-blue-500 hover:opacity-95 active:opacity-90",
         box,
-        disabled && "opacity-70 pointer-events-none"
+        disabled && "pointer-events-none opacity-70"
       )}
     >
       {children}
     </div>
+  );
+};
+
+interface PrimaryButtonsProps {
+  filterQuery: string;
+  isAutoFilter: boolean;
+  isAutoScroll: boolean;
+  addRow: () => void;
+  reverseRows: () => void;
+  setFilterQuery: (s: string) => void;
+  setIsAutoScroll: Dispatch<SetStateAction<boolean>>;
+  setIsAutoFilter: Dispatch<SetStateAction<boolean>>;
+  sortSecondColumn: () => void;
+}
+const PrimaryButtons: FC<PrimaryButtonsProps> = ({
+  filterQuery,
+  isAutoFilter,
+  isAutoScroll,
+  addRow,
+  reverseRows,
+  setFilterQuery,
+  setIsAutoScroll,
+  setIsAutoFilter,
+  sortSecondColumn,
+}) => {
+  return (
+    <>
+      <Button disabled={filterQuery !== "" || isAutoFilter} onClick={addRow}>
+        Add row
+      </Button>
+      <Button
+        disabled={filterQuery !== "" || isAutoFilter}
+        onClick={reverseRows}
+      >
+        Reverse rows
+      </Button>
+      <Button
+        disabled={filterQuery !== "" || isAutoFilter}
+        onClick={sortSecondColumn}
+      >
+        Sort second column
+      </Button>
+      <div
+        className={clsx(
+          "flex h-full w-[150px] overflow-hidden rounded border border-gray-800 bg-white text-[11px] text-gray-800 lg:text-[13px]",
+          box
+        )}
+      >
+        <input
+          value={filterQuery}
+          placeholder="Filter second column..."
+          onChange={(e) => setFilterQuery(e.target.value)}
+          className={"flex-1 pl-2 outline-none"}
+        />
+      </div>
+      <Checkbox
+        active={isAutoScroll}
+        onClick={() => setIsAutoScroll((p) => !p)}
+      >
+        Auto scroll
+      </Checkbox>
+      <Checkbox
+        active={isAutoFilter}
+        onClick={() => setIsAutoFilter((p) => !p)}
+      >
+        Auto filter
+      </Checkbox>
+      <div
+        onClick={() => {
+          setIsAutoFilter(!(isAutoFilter && isAutoScroll));
+          setIsAutoScroll(!(isAutoFilter && isAutoScroll));
+        }}
+        className={
+          "hidden cursor-pointer items-center text-gray-800 hover:opacity-70 lg:flex lg:w-auto"
+        }
+      >
+        {"← Turn on both!"}
+      </div>
+    </>
+  );
+};
+
+interface SecondaryButtonsProps {
+  rowCount: number;
+  reset: () => void;
+  setRowCount: (n: number) => void;
+}
+const SecondaryButtons: FC<SecondaryButtonsProps> = ({
+  rowCount,
+  reset,
+  setRowCount,
+}) => {
+  return (
+    <>
+      <select
+        name="exampleDropdown"
+        value={rowCount}
+        onChange={(e) => setRowCount(Number(e.target.value))}
+        className={clsx(
+          "flex h-full w-[150px] items-center justify-center rounded border border-gray-800 bg-white text-gray-700",
+          box
+        )}
+      >
+        <option value={10_000}>10 000 rows</option>
+        <option value={100_000}>100 000 rows</option>
+        <option value={500_000}>500 000 rows</option>
+        <option value={1_000_000}>1 000 000 rows (might run out of ram)</option>
+        <option value={2_000_000}>2 000 000 rows (might run out of ram)</option>
+        <option value={5_000_000}>5 000 000 rows (might run out of ram)</option>
+        <option value={10_000_000}>
+          10 000 000 rows (might run out of ram)
+        </option>
+      </select>
+      <Button onClick={reset}>Reset</Button>
+    </>
   );
 };
 
@@ -236,15 +318,14 @@ const Checkbox: FC<CheckboxProps> = ({ children, active, onClick }) => {
     <div
       onClick={onClick}
       className={clsx(
-        "flex h-[30px] w-[100px] border border-gray-800 rounded cursor-pointer",
+        "flex h-full w-[150px] cursor-pointer rounded border border-gray-800 lg:w-[70px]",
         box
       )}
     >
       <div
         className={clsx(
-          "flex-1 flex justify-center items-center",
-          active && "bg-blue-500",
-          !active && "text-gray-700"
+          "flex flex-1 items-center justify-center",
+          active ? "bg-red-500" : "text-gray-700"
         )}
       >
         {children}
@@ -282,9 +363,9 @@ const generateRows = async (rowCount: number, grid: Grid, cb: () => void) => {
   // pre-allocation :D
   rowData.length = rowCount;
   for (let i = 0; i < rowCount; i++) {
-    if (i % 10000 === 0 && isTimeToYield("user-visible")) {
+    if (i % 10000 === 0 && isTimeToYield("background")) {
       grid.setRows(rowData);
-      await yieldControl("user-visible");
+      await yieldControl("background");
     }
     const row = generateRow(i);
     rowData[i] = row;
@@ -320,27 +401,27 @@ class AutoScroller {
   start() {
     this.running = true;
     const cb = () => {
-      const metrics = this.grid.getMetrics();
+      const state = this.grid.getState();
       if (!this.running) {
         return;
       }
 
-      if (
-        this.grid.offsetY >
-        metrics.requiredHeight - metrics.viewportHeight - 1
-      ) {
+      if (this.grid.offsetY > state.tableHeight - state.viewportHeight - 1) {
         this.toBottom = false;
       } else if (this.grid.offsetY <= 0) {
         this.toBottom = true;
       }
 
       const delta = this.toBottom
-        ? metrics.viewportHeight
-        : -metrics.viewportHeight;
+        ? state.viewportHeight
+        : -state.viewportHeight;
 
-      this.grid.container.dispatchEvent(
-        new CustomEvent("wheel", { detail: { deltaY: delta } })
-      );
+      const wheelEvent = new WheelEvent("wheel", {
+        deltaY: delta,
+        deltaMode: 0,
+      });
+      this.grid.container.dispatchEvent(wheelEvent);
+
       window.requestAnimationFrame(cb);
     };
     window.requestAnimationFrame(cb);

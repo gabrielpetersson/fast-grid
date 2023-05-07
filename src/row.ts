@@ -53,10 +53,10 @@ export class RowComponent {
     this.setOffset(offset);
   }
   renderCells() {
-    const metrics = this.grid.getMetrics();
+    const state = this.grid.getState();
 
     const renderedCellMap: Record<string, true> = {};
-    for (let i = metrics.startCell; i < metrics.endCell; i++) {
+    for (let i = state.startCell; i < state.endCell; i++) {
       const cell = this.rowState.cells[i]!;
       renderedCellMap[cell.key] = true;
     }
@@ -70,9 +70,9 @@ export class RowComponent {
       removeCellComponents.push(cellComponent);
     }
 
-    for (let i = metrics.startCell; i < metrics.endCell; i++) {
+    for (let i = state.startCell; i < state.endCell; i++) {
       const value = this.rowState.cells[i]!;
-      const offset = metrics.cellOffset + (i - metrics.startCell) * CELL_WIDTH;
+      const offset = state.cellOffset + (i - state.startCell) * CELL_WIDTH;
 
       const existing = this.cellComponentMap[value.key];
       if (existing != null) {
@@ -83,14 +83,14 @@ export class RowComponent {
       const reuseCellComponent = removeCellComponents.pop();
       if (reuseCellComponent != null) {
         delete this.cellComponentMap[reuseCellComponent.value.key];
-        reuseCellComponent.setValue(value);
+        reuseCellComponent.setValue(value, i);
         reuseCellComponent.setOffset(offset);
         this.cellComponentMap[reuseCellComponent.value.key] =
           reuseCellComponent;
         continue;
       }
 
-      const cellComponent = new CellComponent(this, value);
+      const cellComponent = new CellComponent(this, value, i);
       this.el.appendChild(cellComponent.el);
       this.cellComponentMap[cellComponent.value.key] = cellComponent;
       cellComponent.setOffset(offset);

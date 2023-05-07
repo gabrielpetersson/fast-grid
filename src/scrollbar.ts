@@ -52,76 +52,81 @@ export class Scrollbar {
     this.refreshThumb();
   }
   refreshThumb = () => {
-    const metrics = this.grid.getMetrics();
-    this.translateThumbY(metrics.thumbOffsetY);
-    this.setThumbSizeY(metrics.thumbSizeY);
-    this.translateThumbX(metrics.thumbOffsetX);
-    this.setThumbSizeX(metrics.thumbSizeX);
+    const state = this.grid.getState();
+    this.translateThumbY(state.thumbOffsetY);
+    this.setThumbSizeY(state.thumbSizeY);
+    this.translateThumbX(state.thumbOffsetX);
+    this.setThumbSizeX(state.thumbSizeX);
   };
-  setScrollOffsetY = (offset: number) => {
-    const metrics = this.grid.getMetrics();
-    const clampedOffset = Math.max(
-      0,
-      Math.min(offset, metrics.scrollableHeight)
-    );
-    this.grid.offsetY = clampedOffset;
-    const metrics2 = this.grid.getMetrics();
-    this.translateThumbY(metrics2.thumbOffsetY);
+  setScrollOffset = ({ x, y }: { x?: number; y?: number }) => {
+    const state = this.grid.getState();
+    if (x != null) {
+      const clampedOffsetX = Math.max(0, Math.min(x, state.scrollableWidth));
+      this.grid.offsetX = clampedOffsetX;
+    }
+    if (y != null) {
+      const clampedOffsetY = Math.max(0, Math.min(y, state.scrollableHeight));
+      this.grid.offsetY = clampedOffsetY;
+    }
+    const state2 = this.grid.getState();
+    if (x != null) {
+      this.translateThumbX(state2.thumbOffsetX);
+    }
+    if (y != null) {
+      this.translateThumbY(state2.thumbOffsetY);
+    }
   };
-  setScrollOffsetX = (offset: number) => {
-    const metrics = this.grid.getMetrics();
-    const clampedOffset = Math.max(
-      0,
-      Math.min(offset, metrics.scrollableWidth)
-    );
-    this.grid.offsetX = clampedOffset;
-    const metrics2 = this.grid.getMetrics();
-    this.translateThumbX(metrics2.thumbOffsetX);
-  };
-  scrollByY = (offset: number) => {
-    const newOffset = this.grid.offsetY + offset;
-    this.setScrollOffsetY(newOffset);
-    this.grid.renderViewportRows();
-  };
-  scrollByX = (offset: number) => {
-    const newOffset = this.grid.offsetX + offset;
-    this.setScrollOffsetX(newOffset);
-    this.grid.renderViewportCells();
+  scrollBy = ({ x, y }: { x?: number; y?: number }) => {
+    this.setScrollOffset({
+      x: x != null ? this.grid.offsetX + x : undefined,
+      y: y != null ? this.grid.offsetY + y : undefined,
+    });
+    if (y != null) {
+      this.grid.renderViewportRows();
+    }
+    if (x != null) {
+      this.grid.renderViewportCells();
+    }
   };
   onContainerWheel = (e: WheelEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
-    // NOTE(gab): with this logic, fake events can be dispatched that scrolls the grid for performance testing
-    const deltaY = e.deltaY != null ? e.deltaY : (e.detail as any).deltaY ?? 0;
-    const deltaX = e.deltaX != null ? e.deltaX : (e.detail as any).deltaX ?? 0;
-
-    // NOTE(gab): scroll only the direction that scrolls the most
-    if (Math.abs(deltaX) > Math.abs(deltaY)) {
-      this.transientScrollOffsetX += deltaX;
-      if (this.isScrolling) {
-        return;
-      }
-
-      this.isScrolling = true;
-      window.requestAnimationFrame(() => {
-        this.scrollByX(this.transientScrollOffsetX);
-        this.isScrolling = false;
-        this.transientScrollOffsetX = 0;
-      });
-    } else {
-      this.transientScrollOffsetY += deltaY;
-      if (this.isScrolling) {
-        return;
-      }
-
-      this.isScrolling = true;
-      window.requestAnimationFrame(() => {
-        this.scrollByY(this.transientScrollOffsetY);
-        this.isScrolling = false;
-        this.transientScrollOffsetY = 0;
-      });
+    let deltaY = e.deltaY;
+    let deltaX = e.deltaX;
+    // NOTE(gab): it's hard to scroll exactly horizontally or vertically, so zero out
+    // the other dimension for small deltas if scrolling fast
+    if (Math.abs(deltaY) > 30 && Math.abs(deltaX) < 15) {
+      deltaX = 0;
+    } else if (Math.abs(deltaX) > 30 && Math.abs(deltaY) < 15) {
+      deltaY = 0;
     }
+
+    this.transientScrollOffsetX += deltaX;
+    this.transientScrollOffsetY += deltaY;
+    if (this.isScrolling) {
+      return;
+    }
+
+    this.isScrolling = true;
+    // NOTE(gab): makes sure scroll events are only triggered at most
+    // once every frame. useses transient scrolling to keep track of
+    // intermediate scroll offsets
+    window.requestAnimationFrame(() => {
+      this.scrollBy({
+        x:
+          this.transientScrollOffsetX != 0
+            ? this.transientScrollOffsetX
+            : undefined,
+        y:
+          this.transientScrollOffsetY != 0
+            ? this.transientScrollOffsetY
+            : undefined,
+      });
+      this.isScrolling = false;
+      this.transientScrollOffsetX = 0;
+      this.transientScrollOffsetY = 0;
+    });
   };
   onThumbMouseDownY = (e: MouseEvent) => {
     e.preventDefault();
@@ -133,19 +138,18 @@ export class Scrollbar {
   onThumbDragY = (e: MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    const metrics = this.grid.getMetrics();
-    // NOTE(gab): when dragging the scrollbar, we need to calculate the offset relative to the viewport height,
-    // in constrast to the wheel event where the absolute offset is used
-    const relativeOffset =
-      (e.movementY / metrics.viewportHeight) * metrics.requiredHeight;
-    this.transientScrollOffsetY += relativeOffset;
+    const state = this.grid.getState();
+
+    this.transientScrollOffsetY +=
+      // TODO(gab): figure out the 1.5 lol. works perfectly somehow
+      (e.movementY / state.viewportHeight) * state.tableHeight;
     if (this.isScrolling) {
       return;
     }
 
     this.isScrolling = true;
     window.requestAnimationFrame(() => {
-      this.scrollByY(this.transientScrollOffsetY);
+      this.scrollBy({ y: this.transientScrollOffsetY });
       this.isScrolling = false;
       this.transientScrollOffsetY = 0;
     });
@@ -155,9 +159,8 @@ export class Scrollbar {
     document.removeEventListener("mousemove", this.onThumbDragY);
     document.removeEventListener("mouseup", this.onThumbMouseUpY);
     this.isScrolling = false;
-    // NOTE(gab): makes sure the last scroll events are applied if any
-    if (this.transientScrollOffsetY !== 0) {
-      this.scrollByY(this.transientScrollOffsetY);
+    if (this.transientScrollOffsetY > 0) {
+      this.scrollBy({ y: this.transientScrollOffsetY });
     }
     this.transientScrollOffsetY = 0;
   };
@@ -171,17 +174,17 @@ export class Scrollbar {
   onThumbDragX = (e: MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
-    const metrics = this.grid.getMetrics();
-    const relativeOffset =
-      (e.movementX / metrics.viewportWidth) * metrics.requiredWidth;
-    this.transientScrollOffsetX += relativeOffset;
+    const state = this.grid.getState();
+    this.transientScrollOffsetX +=
+      // TODO(gab): figure out the 1.5 lol. works perfectly somehow
+      (e.movementX / state.viewportWidth) * state.tableWidth;
     if (this.isScrolling) {
       return;
     }
 
     this.isScrolling = true;
     window.requestAnimationFrame(() => {
-      this.scrollByX(this.transientScrollOffsetX);
+      this.scrollBy({ x: this.transientScrollOffsetX });
       this.isScrolling = false;
       this.transientScrollOffsetX = 0;
     });
@@ -192,8 +195,8 @@ export class Scrollbar {
     document.removeEventListener("mouseup", this.onThumbMouseUpX);
     this.isScrolling = false;
     // NOTE(gab): makes sure the last cancelled scroll events are applied, if any
-    if (this.transientScrollOffsetX !== 0) {
-      this.scrollByX(this.transientScrollOffsetX);
+    if (this.transientScrollOffsetX > 0) {
+      this.scrollBy({ x: this.transientScrollOffsetX });
     }
     this.transientScrollOffsetX = 0;
   };
@@ -205,18 +208,17 @@ export class Scrollbar {
   };
   onTrackMouseDownY = (e: MouseEvent) => {
     e.preventDefault();
-    const metrics = this.grid.getMetrics();
+    const state = this.grid.getState();
     const relativeOffset =
-      (e.offsetY / metrics.viewportHeight) * metrics.requiredHeight;
-    this.setScrollOffsetY(relativeOffset);
+      (e.offsetY / state.viewportHeight) * state.tableHeight;
+    this.setScrollOffset({ y: relativeOffset });
     this.grid.renderViewportRows();
   };
   onTrackMouseDownX = (e: MouseEvent) => {
     e.preventDefault();
-    const metrics = this.grid.getMetrics();
-    const relativeOffset =
-      (e.offsetX / metrics.viewportWidth) * metrics.requiredWidth;
-    this.setScrollOffsetX(relativeOffset);
+    const state = this.grid.getState();
+    const relativeOffset = (e.offsetX / state.viewportWidth) * state.tableWidth;
+    this.setScrollOffset({ x: relativeOffset });
     this.grid.renderViewportCells();
   };
   translateThumbY = (offset: number) => {
