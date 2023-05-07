@@ -1,7 +1,8 @@
 import { CELL_WIDTH } from "./cell";
 import { Row, RowComponent } from "./row";
-import { Scrollbar, TouchScrolling } from "./scrollbar";
+import { Scrollbar } from "./scrollbar";
 import { filterRows } from "./utils/filter";
+import { TouchScrolling } from "./utils/touch-scroll";
 
 const ROW_HEIGHT = 32;
 const prevFilterMs: number[] = [];
@@ -251,8 +252,9 @@ export class Grid {
     }
   };
   onResizeWindow = () => {
-    this.scrollbar.refreshThumb();
+    this.scrollbar.setScrollOffset({ x: this.offsetX, y: this.offsetY });
     this.renderViewportRows();
     this.renderViewportCells();
+    this.scrollbar.refreshThumb();
   };
 }

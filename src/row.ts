@@ -75,7 +75,6 @@ export class RowComponent {
       const offset = state.cellOffset + (i - state.startCell) * CELL_WIDTH;
 
       const existing = this.cellComponentMap[value.key];
-      console.log(i);
       if (existing != null) {
         existing.setOffset(offset);
         continue;

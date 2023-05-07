@@ -5,7 +5,6 @@ import {
   FC,
   SetStateAction,
   Dispatch,
-  FC,
 } from "react";
 import { Cell, Grid, Row } from "grid";
 import Stats from "stats.js";
