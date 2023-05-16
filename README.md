@@ -30,6 +30,7 @@ Also can't sort and filter at the same time
 
 ### TODO before npm launch
 - break out filtering into its own package
+- config for sort/filter for all columns
 - detach scrollbar from logic, & isolate logic in general
 - modify cells
 - resize columns
