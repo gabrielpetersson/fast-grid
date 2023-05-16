@@ -25,17 +25,22 @@ The most performant DOM-based grid.
 This is the most performant _DOM-based_ table. The fastest table ever built (by far), directly using the GPU and streaming rows efficiently from a custom DB, is [dataland.io](https://dataland.io/). It can render billions of rows at ~5x FPS versus a DOM-based table. 
 
 ### Disclaimers
-In the example, sorting is still blocking main thread, meaning it drops frames. Adding to the custom event loop soon
+In the example, sorting is still blocking main thread, meaning it drops frames. Adding to the custom event loop soon.
+Also can't sort and filter at the same time
+
+### TODO before npm launch
+- break out filtering into its own package
+- detach scrollbar from logic, & isolate logic in general
+- modify cells
+- resize columns
+- custom cells
+- make sure rows are ordered correctly for text selection
+- publish npm package
 
 ### TODO features/performance
 - expand synthetic event-loop to include scrolling & rendering cell contents
-- scrolling one viewport every frame while filtering a million rows runs at 40fps (macbook air m2), figure out why
+- scrolling one viewport every frame while filtering a million rows continuously runs at 40fps (macbook air), figure out why
 - support filter + sort at same time
-- text selection - make sure ordering of rows in the DOM is correct
 - chunk up sorting so it's not blocking main thread
 
-### TODO npm packaging
-- break out filtering into own package
-- detach scrollbar from logic
-- clean up code/rename
-- publish npm package
+
