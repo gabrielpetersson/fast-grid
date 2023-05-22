@@ -12,6 +12,7 @@ The most performant DOM-based grid.
 - Own event loop to prioritize tasks. Never drops a frame
 - Non-passive scrolling. Rows will never be seen rows loading into the UI while scrolling
 - Custom virtualization and scrolling. Not limited by browsers 15 million pixel div height limit 
+- Works on phone by fully custom scrolling. 60fps even on older phones.
 
 ### One million rows benchmark (Air M2) 
 | Benchmark | Score |
