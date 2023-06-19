@@ -130,7 +130,10 @@ export class Grid {
   filterBy = async (query: string) => {
     const t0 = performance.now();
 
-    if (query !== "") {
+    const filteredRows = await (async () => {
+      if (query == null) {
+        return { result: null, cancel: false };
+      }
       const filterId = this.currentFilterId + 1;
       this.currentFilterId = filterId;
       const shouldCancel = () => {
@@ -141,21 +144,27 @@ export class Grid {
         this.renderViewportRows();
         this.renderViewportCells();
         // NOTE(gab): clamps scroll offset into viewport, if rows are filtered away
+        // TODO(gab): this makes filtering feel snappier but the scrollbar size will jump a bit.
+        // estimate the scrollbar size instead given how many results we have now and use that instead.
         this.scrollbar.setScrollOffset({ x: this.offsetX, y: this.offsetY });
       };
-      const res = await filterRows({
+      const filteredRows = await filterRows({
         query,
         rows: this.rows,
         rowsPerViewport: this.getState().rowsPerViewport,
         onEarlyResults,
         shouldCancel,
       });
-      if (res != null) {
-        this.filteredRows = res;
+      if (filteredRows == "canceled") {
+        return { result: null, cancel: true };
       }
-    } else {
-      this.filteredRows = null;
+      return { result: filteredRows, cancel: false };
+    })();
+
+    if (filteredRows.cancel) {
+      return;
     }
+    this.filteredRows = filteredRows.result;
 
     this.scrollbar.setScrollOffset({ x: this.offsetX, y: this.offsetY });
     this.renderViewportRows();
@@ -180,22 +189,22 @@ export class Grid {
   renderViewportRows = () => {
     const state = this.getState();
     const rows = this.getRows();
-    const renderedRowMap: Record<string, true> = {};
+    const renderRows: Record<string, true> = {};
     for (let i = state.startRow; i < state.endRow; i++) {
       const row = rows[i];
       if (row == null) {
         continue;
       }
-      renderedRowMap[row.key] = true;
+      renderRows[row.key] = true;
     }
 
-    const removeRowComponents: RowComponent[] = [];
+    const removeRows: RowComponent[] = [];
     for (const key in this.rowComponentMap) {
-      if (key in renderedRowMap) {
+      if (key in renderRows) {
         continue;
       }
       const rowComponent = this.rowComponentMap[key]!;
-      removeRowComponents.push(rowComponent);
+      removeRows.push(rowComponent);
     }
 
     for (let i = state.startRow; i < state.endRow; i++) {
@@ -205,22 +214,22 @@ export class Grid {
       }
 
       const offset = state.rowOffset + (i - state.startRow) * ROW_HEIGHT;
-      const existingRowComponent = this.rowComponentMap[row.key];
-      if (existingRowComponent != null) {
-        existingRowComponent.setOffset(offset);
+      const existingRow = this.rowComponentMap[row.key];
+      if (existingRow != null) {
+        existingRow.setOffset(offset);
         continue;
       }
 
-      const reuseRowComponent = removeRowComponents.pop();
-      if (reuseRowComponent != null) {
-        delete this.rowComponentMap[reuseRowComponent.rowState.key];
-        reuseRowComponent.setRowState({
+      const reuseRow = removeRows.pop();
+      if (reuseRow != null) {
+        delete this.rowComponentMap[reuseRow.rowState.key];
+        reuseRow.setRowState({
           key: row.key,
           prerender: false,
           offset,
           cells: row.cells,
         });
-        this.rowComponentMap[row.key] = reuseRowComponent;
+        this.rowComponentMap[row.key] = reuseRow;
         continue;
       }
 
@@ -234,9 +243,9 @@ export class Grid {
       this.rowComponentMap[row.key] = rowComponent;
     }
 
-    for (const rowComponent of removeRowComponents) {
-      rowComponent.destroy();
-      delete this.rowComponentMap[rowComponent.rowState.key];
+    for (const row of removeRows) {
+      row.destroy();
+      delete this.rowComponentMap[row.rowState.key];
     }
   };
   renderViewportCells = () => {

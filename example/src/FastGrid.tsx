@@ -82,6 +82,7 @@ export const FastGrid = () => {
 
   const sortSecondColumn = () => {
     if (grid == null) return;
+    // TODO: move into lib and make non-blocking
     grid.rows = grid.rows.sort((a, b) => {
       const aVal = Number(a.cells[1]!.s);
       const bVal = Number(b.cells[1]!.s);
