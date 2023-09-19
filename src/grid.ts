@@ -5,7 +5,7 @@ import { Scrollbar } from "./scrollbar";
 import { TouchScrolling } from "./utils/touch-scroll";
 
 const ROW_HEIGHT = 32;
-
+const MIN_THUMB_SIZE = 4;
 interface GridState {
   endRow: number;
   startRow: number;
@@ -98,29 +98,16 @@ export class Grid {
 
     const scrollableHeight = Math.max(tableHeight - this.viewportHeight, 0);
 
-    const asymptoticValue = (): number => {
-      const minThumbSize = 4.1; // Slightly above 4%
+    const scrollThumbYPct =
+      tableHeight === 0
+        ? 1
+        : // NOTE(gab): makes thumb smaller slower, so that smaller changes in rows still slighly changes size
+          0.97 * Math.sqrt(this.viewportHeight / tableHeight) + 0.03;
 
-      let ratio = this.viewportHeight / tableHeight;
-      const factor = 50; // Adjust this value to change the curve of the function.
-
-      let scrollbarThumbPercentHeightOfViewport =
-        100 *
-        (minThumbSize / 100 +
-          (1 - minThumbSize / 100) / (1 + factor * Math.log(1 + 1 / ratio)));
-
-      scrollbarThumbPercentHeightOfViewport = Math.max(
-        scrollbarThumbPercentHeightOfViewport,
-        minThumbSize
-      ); // Ensure it doesn't go below our minimum
-      return Math.min(100, scrollbarThumbPercentHeightOfViewport) / 100;
-    };
-
-    const scrollThumbYPct = tableHeight === 0 ? 1 : asymptoticValue(); //this.viewportHeight / tableHeight
     const thumbSizeY = Math.round(
       Math.max(
         Math.min(scrollThumbYPct * this.viewportHeight, this.viewportHeight),
-        30
+        0
       )
     );
 
@@ -202,7 +189,7 @@ export class Grid {
   setRows = (rows: Row[]) => {
     this.rowManager.rows = rows;
     this.rowManager.computedRows = rows;
-    this.scrollbar.setScrollOffset({ y: this.offsetY });
+    this.scrollbar.setScrollOffset({ y: this.offsetY, x: this.offsetX });
     this.renderViewportRows();
     this.scrollbar.refreshThumb();
   };
