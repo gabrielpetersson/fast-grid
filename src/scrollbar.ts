@@ -58,6 +58,30 @@ export class Scrollbar {
     this.translateThumbX(state.thumbOffsetX);
     this.setThumbSizeX(state.thumbSizeX);
   };
+  clampThumbIfNeeded = ({ x, y }: { x?: number; y?: number }) => {
+    const state = this.grid.getState();
+    let shouldTranslateThumb = false;
+    if (y != null && (y < 0 || y > state.scrollableHeight)) {
+      const clampedOffsetY = Math.max(0, Math.min(y, state.scrollableHeight));
+      this.grid.offsetY = clampedOffsetY;
+      shouldTranslateThumb = true;
+    }
+    if (x != null && (x < 0 || x > state.scrollableWidth)) {
+      const clampedOffsetX = Math.max(0, Math.min(x, state.scrollableWidth));
+      this.grid.offsetX = clampedOffsetX;
+      shouldTranslateThumb = true;
+    }
+
+    if (shouldTranslateThumb) {
+      const state2 = this.grid.getState();
+      if (x != null) {
+        this.translateThumbX(state2.thumbOffsetX);
+      }
+      if (y != null) {
+        this.translateThumbY(state2.thumbOffsetY);
+      }
+    }
+  };
   setScrollOffset = ({ x, y }: { x?: number; y?: number }) => {
     const state = this.grid.getState();
     if (x != null) {
@@ -142,7 +166,7 @@ export class Scrollbar {
 
     this.transientScrollOffsetY +=
       // TODO(gab): figure out the 1.5 lol. works perfectly somehow
-      (e.movementY / state.viewportHeight) * state.tableHeight;
+      (e.movementY / this.grid.viewportHeight) * state.tableHeight;
     if (this.isScrolling) {
       return;
     }
@@ -177,7 +201,7 @@ export class Scrollbar {
     const state = this.grid.getState();
     this.transientScrollOffsetX +=
       // TODO(gab): figure out the 1.5 lol. works perfectly somehow
-      (e.movementX / state.viewportWidth) * state.tableWidth;
+      (e.movementX / this.grid.viewportWidth) * state.tableWidth;
     if (this.isScrolling) {
       return;
     }
@@ -210,14 +234,15 @@ export class Scrollbar {
     e.preventDefault();
     const state = this.grid.getState();
     const relativeOffset =
-      (e.offsetY / state.viewportHeight) * state.tableHeight;
+      (e.offsetY / this.grid.viewportHeight) * state.tableHeight;
     this.setScrollOffset({ y: relativeOffset });
     this.grid.renderViewportRows();
   };
   onTrackMouseDownX = (e: MouseEvent) => {
     e.preventDefault();
     const state = this.grid.getState();
-    const relativeOffset = (e.offsetX / state.viewportWidth) * state.tableWidth;
+    const relativeOffset =
+      (e.offsetX / this.grid.viewportWidth) * state.tableWidth;
     this.setScrollOffset({ x: relativeOffset });
     this.grid.renderViewportCells();
   };

@@ -57,7 +57,7 @@ export class RowComponent {
 
     const renderedCellMap: Record<string, true> = {};
     for (let i = state.startCell; i < state.endCell; i++) {
-      const cell = this.rowState.cells[i]!;
+      const cell = this.rowState.cells[i];
       renderedCellMap[cell.key] = true;
     }
 

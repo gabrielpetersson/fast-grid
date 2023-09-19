@@ -33,25 +33,26 @@ export const FastGrid = () => {
     const t0 = performance.now();
     const grid = new Grid(container, []);
     console.info("Ms to intitialize grid:", performance.now() - t0);
+    (window as any).grid = grid;
     setGrid(grid);
     setAutoScroller(new AutoScroller(grid));
   }, []);
 
   useEffect(() => {
     if (grid == null) return;
-    grid.filterBy(filterQuery);
+    grid.rowManager.filterBy(filterQuery);
   }, [filterQuery, grid]);
 
   useEffect(() => {
     if (grid == null || !isAutoFilter) return;
     const id = setInterval(() => {
       setFilterQuery((p) => {
-        if (p.length >= 5) {
+        if (p.length >= 6) {
           return "";
         }
         return p + Math.floor(Math.random() * 10);
       });
-    }, 300);
+    }, 333);
     return () => clearInterval(id);
   }, [isAutoFilter, grid, filterQuery]);
 
@@ -69,21 +70,21 @@ export const FastGrid = () => {
 
   const addRow = () => {
     if (grid == null) return;
-    const row = generateRow(grid.rows.length);
-    grid.rows.push(row);
+    const row = generateRow(grid.rowManager.rows.length);
+    grid.rowManager.rows.push(row);
     grid.scrollToBottom();
   };
 
   const reverseRows = () => {
     if (grid == null) return;
-    grid.rows.reverse();
+    grid.rowManager.rows.reverse();
     grid.renderViewportRows();
   };
 
   const sortSecondColumn = () => {
     if (grid == null) return;
     // TODO: move into lib and make non-blocking
-    grid.rows = grid.rows.sort((a, b) => {
+    grid.rowManager.rows = grid.rowManager.rows.sort((a, b) => {
       const aVal = Number(a.cells[1]!.s);
       const bVal = Number(b.cells[1]!.s);
       return sortToggle ? aVal - bVal : bVal - aVal;
@@ -361,15 +362,13 @@ const generateRow = (i: number): Row => {
 
 const generateRows = async (rowCount: number, grid: Grid, cb: () => void) => {
   const rowData: Row[] = [];
-  // pre-allocation :D
-  rowData.length = rowCount;
   for (let i = 0; i < rowCount; i++) {
     if (i % 10000 === 0 && isTimeToYield("background")) {
       grid.setRows(rowData);
       await yieldControl("background");
     }
     const row = generateRow(i);
-    rowData[i] = row;
+    rowData.push(row);
   }
   grid.setRows(rowData);
   cb();
@@ -407,15 +406,18 @@ class AutoScroller {
         return;
       }
 
-      if (this.grid.offsetY > state.tableHeight - state.viewportHeight - 1) {
+      if (
+        this.grid.offsetY >
+        state.tableHeight - this.grid.viewportHeight - 1
+      ) {
         this.toBottom = false;
       } else if (this.grid.offsetY <= 0) {
         this.toBottom = true;
       }
 
       const delta = this.toBottom
-        ? state.viewportHeight
-        : -state.viewportHeight;
+        ? this.grid.viewportHeight / 2
+        : -this.grid.viewportHeight / 2;
 
       const wheelEvent = new WheelEvent("wheel", {
         deltaY: delta,
