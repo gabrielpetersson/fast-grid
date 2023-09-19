@@ -1,5 +1,6 @@
 export class TouchScrolling {
   el: HTMLDivElement;
+  decelerationId: number | null;
   touchScrollState?: {
     lastOffsetY: number;
     lastDeltaY: number;
@@ -11,6 +12,7 @@ export class TouchScrolling {
     this.el.addEventListener("touchstart", this.onTouchStart);
     this.el.addEventListener("touchend", this.onTouchEnd);
     this.el.addEventListener("touchmove", this.onTouchMove);
+    this.decelerationId = null;
   }
   dispatchWheelEvent(deltaY: number, deltaX: number) {
     const wheelEvent = new WheelEvent("wheel", {
@@ -20,7 +22,7 @@ export class TouchScrolling {
     });
     this.el.dispatchEvent(wheelEvent);
   }
-  simulateDeceleratedScrolling() {
+  simulateDeceleratedScrolling(decelerationId: number) {
     if (this.touchScrollState == null) {
       return;
     }
@@ -31,7 +33,10 @@ export class TouchScrolling {
     const step = () => {
       currentDeltaY *= decelerationFactor;
       currentDeltaX *= decelerationFactor;
-      if (Math.abs(currentDeltaY) < 0.1 && Math.abs(currentDeltaX) < 0.1) {
+      if (
+        (Math.abs(currentDeltaY) < 0.1 && Math.abs(currentDeltaX) < 0.1) ||
+        decelerationId !== this.decelerationId
+      ) {
         return;
       }
       this.dispatchWheelEvent(currentDeltaY, currentDeltaX);
@@ -52,7 +57,8 @@ export class TouchScrolling {
   };
   onTouchEnd = () => {
     if (this.touchScrollState != null) {
-      this.simulateDeceleratedScrolling();
+      this.decelerationId = Date.now();
+      this.simulateDeceleratedScrolling(this.decelerationId);
     }
     delete this.touchScrollState;
   };
