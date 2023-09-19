@@ -5,7 +5,7 @@ import { Scrollbar } from "./scrollbar";
 import { TouchScrolling } from "./utils/touch-scroll";
 
 const ROW_HEIGHT = 32;
-const MIN_THUMB_SIZE = 4;
+
 interface GridState {
   endRow: number;
   startRow: number;
