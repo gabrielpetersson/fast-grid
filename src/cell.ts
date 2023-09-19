@@ -35,7 +35,7 @@ class StringCell {
     this.setValue(this.cellComponent.value.value);
   }
   setValue(value: string) {
-    // NOTE(gab): comparing innerText with textContent. why is nodeValue not setting anything??? react uses that
+    // NOTE(gab): comparing innerText with textContent.
     // experiment showing that textContent is not only faster for changing the text content, but
     // is also the only one that does not run calculations on setting the same value
     // https://codesandbox.io/s/textcontent-vs-innertext-vs-innerhtml-fj3cs0

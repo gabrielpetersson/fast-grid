@@ -352,12 +352,12 @@ const generateRow = (i: number): Row => {
   ];
   for (let j = 0; j < N_COLS; j++) {
     const v = Math.round(skewedRandom() * 100000000);
-    cells[j + 1]! = {
+    cells.push({
       type: "string",
       value: String(v),
       key: `${i}-${j}`,
       s: v, // TODO(gab): rm field, sorting on this for efficiency. will fix with separate number/string cells
-    };
+    });
   }
   return { key: String(i), cells };
 };
