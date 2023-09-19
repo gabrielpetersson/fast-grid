@@ -66,7 +66,9 @@ export class Grid {
     this.scrollbar = new Scrollbar(this);
     new TouchScrolling(this.container);
 
-    window.addEventListener("resize", this.onResizeWindow);
+    // window.addEventListener("resize", this.onResizeWindow);
+    const observer = new ResizeObserver(this.onResize);
+    observer.observe(container);
     this.renderViewportRows();
   }
   getState = (): GridState => {
@@ -181,11 +183,6 @@ export class Grid {
       cellsPerRow,
     };
   };
-  scrollToBottom = () => {
-    const state = this.getState();
-    this.scrollbar.setScrollOffset({ y: state.scrollableHeight });
-    this.renderViewportRows();
-  };
   setRows = (rows: Row[]) => {
     this.rowManager.rows = rows;
     this.rowManager.computedRows = rows;
@@ -268,7 +265,7 @@ export class Grid {
       rowComponent.renderCells();
     }
   };
-  onResizeWindow = () => {
+  onResize = () => {
     this.viewportWidth = this.container.clientWidth;
     this.viewportHeight = this.container.clientHeight;
     this.scrollbar.setScrollOffset({ x: this.offsetX, y: this.offsetY });

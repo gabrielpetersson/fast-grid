@@ -72,7 +72,9 @@ export const FastGrid = () => {
     if (grid == null) return;
     const row = generateRow(grid.rowManager.rows.length);
     grid.rowManager.rows.push(row);
-    grid.scrollToBottom();
+    const state = grid.getState();
+    grid.scrollbar.setScrollOffset({ y: state.scrollableHeight });
+    grid.renderViewportRows();
   };
 
   const reverseRows = () => {
