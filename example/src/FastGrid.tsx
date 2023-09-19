@@ -416,8 +416,8 @@ class AutoScroller {
       }
 
       const delta = this.toBottom
-        ? this.grid.viewportHeight / 2
-        : -this.grid.viewportHeight / 2;
+        ? this.grid.viewportHeight
+        : -this.grid.viewportHeight;
 
       const wheelEvent = new WheelEvent("wheel", {
         deltaY: delta,

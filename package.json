@@ -14,7 +14,6 @@
     "vite": "^4.3.2"
   },
   "dependencies": {
-    "main-thread-scheduling": "8.0.0",
-    "rollup-plugin-closure-compiler": "0.1.0"
+    "main-thread-scheduling": "8.0.0"
   }
 }

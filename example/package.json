@@ -11,11 +11,11 @@
   },
   "dependencies": {
     "clsx": "^1.2.1",
+    "grid": "file:../",
     "main-thread-scheduling": "^8.0.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "stats.js": "^0.17.0",
-    "grid": "file:../"
+    "stats.js": "^0.17.0"
   },
   "devDependencies": {
     "@types/react": "^18.0.28",
