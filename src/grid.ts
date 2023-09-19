@@ -1,15 +1,39 @@
 import { CELL_WIDTH } from "./cell";
 import { Row, RowComponent } from "./row";
+import { RowManager } from "./row-manager/row-manager";
 import { Scrollbar } from "./scrollbar";
-import { filterRows } from "./utils/filter";
 import { TouchScrolling } from "./utils/touch-scroll";
 
 const ROW_HEIGHT = 32;
-const prevFilterMs: number[] = [];
+const MIN_THUMB_SIZE = 4;
+interface GridState {
+  endRow: number;
+  startRow: number;
+  rowOffset: number;
+
+  startCell: number;
+  endCell: number;
+  cellOffset: number;
+
+  scrollableHeight: number;
+  tableHeight: number;
+  thumbOffsetY: number;
+  thumbSizeY: number;
+
+  scrollableWidth: number;
+  tableWidth: number;
+  thumbOffsetX: number;
+  thumbSizeX: number;
+
+  rowsPerViewport: number;
+  cellsPerRow: number;
+}
+
 export class Grid {
+  state: GridState;
+
   offsetY: number;
   offsetX: number;
-  rows: Row[];
 
   windowHeight: number;
   windowWidth: number;
@@ -18,41 +42,50 @@ export class Grid {
   rowComponentMap: Record<string, RowComponent>;
 
   scrollbar: Scrollbar;
-  currentFilterId: number;
-  filteredRows: Row[] | null;
+  rowManager: RowManager;
+
+  viewportWidth: number;
+  viewportHeight: number;
   constructor(container: HTMLDivElement, rows: Row[]) {
-    this.currentFilterId = 0;
-    this.filteredRows = null;
+    this.container = container;
+    this.rowManager = new RowManager(this, rows);
+
+    this.viewportWidth = this.container.clientWidth;
+    this.viewportHeight = this.container.clientHeight;
+    this.state = this.getState();
 
     this.offsetY = 0;
     this.offsetX = 0;
-    this.rows = rows;
-    this.container = container;
+
     this.rowComponentMap = {};
     this.windowHeight = window.innerHeight;
     this.windowWidth = window.innerWidth;
 
-    this.container = container;
     this.rowComponentMap = {};
 
     this.scrollbar = new Scrollbar(this);
     new TouchScrolling(this.container);
 
-    window.addEventListener("resize", this.onResizeWindow);
+    // window.addEventListener("resize", this.onResizeWindow);
+    const observer = new ResizeObserver(this.onResize);
+    observer.observe(container);
     this.renderViewportRows();
-    // TODO(gab): add window resize listener and reset styles
   }
-  getState = () => {
-    const rows = this.getRows();
-    const numCells = rows[0]?.cells.length ?? 0;
+  getState = (): GridState => {
+    const rows = this.rowManager.getRows();
+    let numCells: number;
+    // console.log(rows);
+    if (rows.length === 0) {
+      numCells = 0;
+    } else {
+      numCells = rows[0].cells.length;
+    }
 
-    const viewportWidth = this.container.clientWidth;
-    const cellsPerRow = Math.floor(viewportWidth / CELL_WIDTH) + 2;
+    const cellsPerRow = Math.floor(this.viewportWidth / CELL_WIDTH) + 2;
     const tableWidth = numCells * CELL_WIDTH ?? 0;
 
-    const viewportHeight = this.container.clientHeight;
     // NOTE(gab): full viewport, and an additional row top and bottom to simulate scrolling
-    const rowsPerViewport = Math.floor(viewportHeight / ROW_HEIGHT) + 2;
+    const rowsPerViewport = Math.floor(this.viewportHeight / ROW_HEIGHT) + 2;
 
     const tableHeight = rows.length * ROW_HEIGHT;
 
@@ -65,30 +98,68 @@ export class Grid {
     const endRow = Math.min(startRow + rowsPerViewport, rows.length);
     const rowOffset = -Math.floor(this.offsetY % ROW_HEIGHT);
 
-    const scrollableHeight = Math.max(tableHeight - viewportHeight, 0);
-    const scrollThumbYPct =
-      tableHeight === 0 ? 100 : viewportHeight / tableHeight;
-    const thumbSizeY = Math.max(
-      Math.min(scrollThumbYPct * viewportHeight, viewportHeight),
-      30
-    );
-    const thumbOffsetY = (() => {
-      if (scrollableHeight === 0) return 0;
-      return (
-        (this.offsetY / scrollableHeight) * viewportHeight -
-        thumbSizeY * (this.offsetY / scrollableHeight)
-      );
-    })();
+    const scrollableHeight = Math.max(tableHeight - this.viewportHeight, 0);
 
-    const scrollableWidth = Math.max(tableWidth - viewportWidth, 0);
-    const scrollThumbXPct = tableWidth === 0 ? 100 : viewportWidth / tableWidth;
-    const thumbSizeX = Math.max(
-      Math.min(scrollThumbXPct * viewportWidth, viewportWidth),
-      30
+    const scrollThumbYPct =
+      tableHeight === 0
+        ? 1
+        : // NOTE(gab): makes thumb smaller slower, so that smaller changes in rows still slighly changes size
+          0.97 * Math.sqrt(this.viewportHeight / tableHeight) + 0.03;
+
+    const thumbSizeY = Math.round(
+      Math.max(
+        Math.min(scrollThumbYPct * this.viewportHeight, this.viewportHeight),
+        0
+      )
+    );
+
+    let thumbOffsetY: number;
+    if (scrollableHeight === 0) {
+      thumbOffsetY = 0;
+    } else {
+      thumbOffsetY =
+        (this.offsetY / scrollableHeight) * this.viewportHeight -
+        thumbSizeY * (this.offsetY / scrollableHeight);
+    }
+
+    const scrollableWidth = Math.max(tableWidth - this.viewportWidth, 0);
+    const scrollThumbXPct =
+      tableWidth === 0 ? 100 : this.viewportWidth / tableWidth;
+
+    const thumbSizeX = Math.round(
+      Math.max(
+        Math.min(scrollThumbXPct * this.viewportWidth, this.viewportWidth),
+        30
+      )
     );
     const thumbOffsetX =
-      (this.offsetX / scrollableWidth) * viewportWidth -
+      (this.offsetX / scrollableWidth) * this.viewportWidth -
       thumbSizeX * (this.offsetX / scrollableWidth);
+
+    // todo: a bit dumb will fix. anyway fixes GC
+    if (this.state != null) {
+      this.state.endRow = endRow;
+      this.state.startRow = startRow;
+      this.state.rowOffset = rowOffset;
+
+      this.state.startCell = startCell;
+      this.state.endCell = endCell;
+      this.state.cellOffset = cellOffset;
+
+      this.state.scrollableHeight = scrollableHeight;
+      this.state.tableHeight = tableHeight;
+      this.state.thumbOffsetY = thumbOffsetY;
+      this.state.thumbSizeY = thumbSizeY;
+
+      this.state.scrollableWidth = scrollableWidth;
+      this.state.tableWidth = tableWidth;
+      this.state.thumbOffsetX = thumbOffsetX;
+      this.state.thumbSizeX = thumbSizeX;
+
+      this.state.rowsPerViewport = rowsPerViewport;
+      this.state.cellsPerRow = cellsPerRow;
+      return this.state;
+    }
     return {
       endRow,
       startRow,
@@ -97,9 +168,6 @@ export class Grid {
       startCell,
       endCell,
       cellOffset,
-
-      viewportWidth,
-      viewportHeight,
 
       scrollableHeight,
       tableHeight,
@@ -115,87 +183,33 @@ export class Grid {
       cellsPerRow,
     };
   };
-  scrollToBottom = () => {
-    const state = this.getState();
-    this.scrollbar.setScrollOffset({ y: state.scrollableHeight });
-    this.renderViewportRows();
-  };
-  getRows = () => {
-    if (this.filteredRows != null) {
-      return this.filteredRows;
-    }
-    return this.rows;
-  };
-  // TODO(gab): move this out from the package
-  filterBy = async (query: string) => {
-    const t0 = performance.now();
-
-    if (query !== "") {
-      const filterId = this.currentFilterId + 1;
-      this.currentFilterId = filterId;
-      const shouldCancel = () => {
-        return this.currentFilterId !== filterId;
-      };
-      const onEarlyResults = (rows: Row[]) => {
-        this.filteredRows = rows;
-        this.renderViewportRows();
-        this.renderViewportCells();
-        // NOTE(gab): clamps scroll offset into viewport, if rows are filtered away
-        this.scrollbar.setScrollOffset({ x: this.offsetX, y: this.offsetY });
-      };
-      const res = await filterRows({
-        query,
-        rows: this.rows,
-        rowsPerViewport: this.getState().rowsPerViewport,
-        onEarlyResults,
-        shouldCancel,
-      });
-      if (res != null) {
-        this.filteredRows = res;
-      }
-    } else {
-      this.filteredRows = null;
-    }
-
-    this.scrollbar.setScrollOffset({ x: this.offsetX, y: this.offsetY });
-    this.renderViewportRows();
-    this.renderViewportCells();
-    // NOTE(gab): refresh size of thumb after completely done filtering, to prevent jumping of size
-    this.scrollbar.refreshThumb();
-
-    const ms = performance.now() - t0;
-    prevFilterMs.push(ms);
-    const avgFilterMs =
-      prevFilterMs.reduce((a, b) => a + b, 0) / prevFilterMs.length;
-    console.log(`Filtering took ${ms}. Avg: ${avgFilterMs}`);
-  };
   setRows = (rows: Row[]) => {
-    this.rows = rows;
-    this.filteredRows = null;
-    this.scrollbar.setScrollOffset({ y: this.offsetY });
+    this.rowManager.rows = rows;
+    this.rowManager.computedRows = rows;
+    this.scrollbar.setScrollOffset({ y: this.offsetY, x: this.offsetX });
     this.renderViewportRows();
     this.scrollbar.refreshThumb();
   };
   // TODO(gab): make readable
   renderViewportRows = () => {
     const state = this.getState();
-    const rows = this.getRows();
-    const renderedRowMap: Record<string, true> = {};
+    const rows = this.rowManager.getRows();
+    const renderRows: Record<string, true> = {};
     for (let i = state.startRow; i < state.endRow; i++) {
       const row = rows[i];
       if (row == null) {
         continue;
       }
-      renderedRowMap[row.key] = true;
+      renderRows[row.key] = true;
     }
 
-    const removeRowComponents: RowComponent[] = [];
+    const removeRows: RowComponent[] = [];
     for (const key in this.rowComponentMap) {
-      if (key in renderedRowMap) {
+      if (key in renderRows) {
         continue;
       }
       const rowComponent = this.rowComponentMap[key]!;
-      removeRowComponents.push(rowComponent);
+      removeRows.push(rowComponent);
     }
 
     for (let i = state.startRow; i < state.endRow; i++) {
@@ -205,22 +219,22 @@ export class Grid {
       }
 
       const offset = state.rowOffset + (i - state.startRow) * ROW_HEIGHT;
-      const existingRowComponent = this.rowComponentMap[row.key];
-      if (existingRowComponent != null) {
-        existingRowComponent.setOffset(offset);
+      const existingRow = this.rowComponentMap[row.key];
+      if (existingRow != null) {
+        existingRow.setOffset(offset);
         continue;
       }
 
-      const reuseRowComponent = removeRowComponents.pop();
-      if (reuseRowComponent != null) {
-        delete this.rowComponentMap[reuseRowComponent.rowState.key];
-        reuseRowComponent.setRowState({
+      const reuseRow = removeRows.pop();
+      if (reuseRow != null) {
+        delete this.rowComponentMap[reuseRow.rowState.key];
+        reuseRow.setRowState({
           key: row.key,
           prerender: false,
           offset,
           cells: row.cells,
         });
-        this.rowComponentMap[row.key] = reuseRowComponent;
+        this.rowComponentMap[row.key] = reuseRow;
         continue;
       }
 
@@ -234,14 +248,14 @@ export class Grid {
       this.rowComponentMap[row.key] = rowComponent;
     }
 
-    for (const rowComponent of removeRowComponents) {
-      rowComponent.destroy();
-      delete this.rowComponentMap[rowComponent.rowState.key];
+    for (const row of removeRows) {
+      row.destroy();
+      delete this.rowComponentMap[row.rowState.key];
     }
   };
   renderViewportCells = () => {
     const state = this.getState();
-    const rows = this.getRows();
+    const rows = this.rowManager.getRows();
     for (let i = state.startRow; i < state.endRow; i++) {
       const row = rows[i]!;
       const rowComponent = this.rowComponentMap[row.key];
@@ -251,7 +265,9 @@ export class Grid {
       rowComponent.renderCells();
     }
   };
-  onResizeWindow = () => {
+  onResize = () => {
+    this.viewportWidth = this.container.clientWidth;
+    this.viewportHeight = this.container.clientHeight;
     this.scrollbar.setScrollOffset({ x: this.offsetX, y: this.offsetY });
     this.renderViewportRows();
     this.renderViewportCells();

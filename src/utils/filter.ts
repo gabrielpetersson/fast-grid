@@ -14,7 +14,7 @@ export const filterRows = async ({
   rowsPerViewport,
   onEarlyResults,
   shouldCancel,
-}: FilterRows) => {
+}: FilterRows): Promise<Row[] | "canceled"> => {
   const ROW_CHUNK_SIZE = 500;
   const filteredRows: Row[] = [];
   const numChunks = Math.ceil(rows.length / ROW_CHUNK_SIZE);
@@ -25,13 +25,13 @@ export const filterRows = async ({
     const endIndex = Math.min(startIndex + ROW_CHUNK_SIZE, rows.length);
 
     if (shouldCancel()) {
-      return;
+      return "canceled";
     }
     // NOTE(gab): this is the magic - run work sync is possible, awaits if main thread busy
     if (isTimeToYield("user-visible")) {
       await yieldControl("user-visible");
       if (shouldCancel()) {
-        return;
+        return "canceled";
       }
     }
 

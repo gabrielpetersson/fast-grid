@@ -24,7 +24,7 @@ export class TouchScrolling {
     if (this.touchScrollState == null) {
       return;
     }
-    const decelerationFactor = 0.95; // Adjust this value to control the rate of deceleration. Lower values result in faster deceleration.
+    const decelerationFactor = 0.95;
     let currentDeltaY = this.touchScrollState.lastDeltaY;
     let currentDeltaX = this.touchScrollState.lastDeltaX;
 
