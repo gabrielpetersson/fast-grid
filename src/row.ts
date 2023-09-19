@@ -55,50 +55,49 @@ export class RowComponent {
   renderCells() {
     const state = this.grid.getState();
 
-    const renderedCellMap: Record<string, true> = {};
+    const renderCells: Record<string, true> = {};
     for (let i = state.startCell; i < state.endCell; i++) {
       const cell = this.rowState.cells[i];
-      renderedCellMap[cell.key] = true;
+      renderCells[cell.key] = true;
     }
 
-    const removeCellComponents: CellComponent[] = [];
+    const removeCells: CellComponent[] = [];
     for (const key in this.cellComponentMap) {
-      if (key in renderedCellMap) {
+      if (key in renderCells) {
         continue;
       }
-      const cellComponent = this.cellComponentMap[key]!;
-      removeCellComponents.push(cellComponent);
+      const cell = this.cellComponentMap[key]!;
+      removeCells.push(cell);
     }
 
     for (let i = state.startCell; i < state.endCell; i++) {
       const value = this.rowState.cells[i]!;
       const offset = state.cellOffset + (i - state.startCell) * CELL_WIDTH;
 
-      const existing = this.cellComponentMap[value.key];
-      if (existing != null) {
-        existing.setOffset(offset);
+      const existingCell = this.cellComponentMap[value.key];
+      if (existingCell != null) {
+        existingCell.setOffset(offset);
         continue;
       }
 
-      const reuseCellComponent = removeCellComponents.pop();
-      if (reuseCellComponent != null) {
-        delete this.cellComponentMap[reuseCellComponent.value.key];
-        reuseCellComponent.setValue(value, i);
-        reuseCellComponent.setOffset(offset);
-        this.cellComponentMap[reuseCellComponent.value.key] =
-          reuseCellComponent;
+      const reuseCell = removeCells.pop();
+      if (reuseCell != null) {
+        delete this.cellComponentMap[reuseCell.value.key];
+        reuseCell.setValue(value, i);
+        reuseCell.setOffset(offset);
+        this.cellComponentMap[reuseCell.value.key] = reuseCell;
         continue;
       }
 
-      const cellComponent = new CellComponent(this, value, i);
-      this.el.appendChild(cellComponent.el);
-      this.cellComponentMap[cellComponent.value.key] = cellComponent;
-      cellComponent.setOffset(offset);
+      const newCell = new CellComponent(this, value, i);
+      this.el.appendChild(newCell.el);
+      this.cellComponentMap[newCell.value.key] = newCell;
+      newCell.setOffset(offset);
     }
 
-    for (const cellComponent of removeCellComponents) {
-      cellComponent.destroy();
-      delete this.cellComponentMap[cellComponent.value.key];
+    for (const cell of removeCells) {
+      cell.destroy();
+      delete this.cellComponentMap[cell.value.key];
     }
   }
   setRowState(rowState: RowState) {
