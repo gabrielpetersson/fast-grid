@@ -58,28 +58,35 @@ export class Scrollbar {
     this.translateThumbX(state.thumbOffsetX);
     this.setThumbSizeX(state.thumbSizeX);
   };
-  clampThumbIfNeeded = ({ x, y }: { x?: number; y?: number }) => {
+  clampThumbIfNeeded = () => {
     const state = this.grid.getState();
     let shouldTranslateThumb = false;
-    if (y != null && (y < 0 || y > state.scrollableHeight)) {
-      const clampedOffsetY = Math.max(0, Math.min(y, state.scrollableHeight));
+    if (
+      this.grid.offsetY != null &&
+      (this.grid.offsetY < 0 || this.grid.offsetY > state.scrollableHeight)
+    ) {
+      const clampedOffsetY = Math.max(
+        0,
+        Math.min(this.grid.offsetY, state.scrollableHeight)
+      );
       this.grid.offsetY = clampedOffsetY;
       shouldTranslateThumb = true;
     }
-    if (x != null && (x < 0 || x > state.scrollableWidth)) {
-      const clampedOffsetX = Math.max(0, Math.min(x, state.scrollableWidth));
+    if (
+      this.grid.offsetX != null &&
+      (this.grid.offsetX < 0 || this.grid.offsetX > state.scrollableWidth)
+    ) {
+      const clampedOffsetX = Math.max(
+        0,
+        Math.min(this.grid.offsetX, state.scrollableWidth)
+      );
       this.grid.offsetX = clampedOffsetX;
       shouldTranslateThumb = true;
     }
-
     if (shouldTranslateThumb) {
       const state2 = this.grid.getState();
-      if (x != null) {
-        this.translateThumbX(state2.thumbOffsetX);
-      }
-      if (y != null) {
-        this.translateThumbY(state2.thumbOffsetY);
-      }
+      this.translateThumbX(state2.thumbOffsetX);
+      this.translateThumbY(state2.thumbOffsetY);
     }
   };
   setScrollOffset = ({ x, y }: { x?: number; y?: number }) => {

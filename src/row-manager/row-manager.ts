@@ -40,10 +40,7 @@ export class RowManager {
         // NOTE(gab): clamps scroll offset into viewport, if rows are filtered away
         // TODO(gab): this makes filtering feel snappier but the scrollbar size will jump a bit.
         // estimate the scrollbar size instead given how many results we have now and use that instead.
-        this.grid.scrollbar.clampThumbIfNeeded({
-          x: this.grid.offsetX,
-          y: this.grid.offsetY,
-        });
+        this.grid.scrollbar.clampThumbIfNeeded();
       };
       const computedRows = await filterRows({
         query,
@@ -63,10 +60,7 @@ export class RowManager {
     }
     this.computedRows = computedRows.result;
 
-    this.grid.scrollbar.clampThumbIfNeeded({
-      x: this.grid.offsetX,
-      y: this.grid.offsetY,
-    });
+    this.grid.scrollbar.clampThumbIfNeeded();
     this.grid.renderViewportRows();
     this.grid.renderViewportCells();
     // NOTE(gab): refresh size of thumb after completely done filtering, to prevent jumping of size
