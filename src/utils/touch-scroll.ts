@@ -53,11 +53,11 @@ export class TouchScrolling {
         lastOffsetX: event.touches[0].clientX,
         lastDeltaX: 0,
       };
+      this.decelerationId = Date.now();
     }
   };
   onTouchEnd = () => {
-    if (this.touchScrollState != null) {
-      this.decelerationId = Date.now();
+    if (this.touchScrollState != null && this.decelerationId != null) {
       this.simulateDeceleratedScrolling(this.decelerationId);
     }
     delete this.touchScrollState;
@@ -73,6 +73,14 @@ export class TouchScrolling {
     const deltaY = this.touchScrollState.lastOffsetY - currentTouchY;
     const deltaX = this.touchScrollState.lastOffsetX - currentTouchX;
     this.dispatchWheelEvent(deltaY, deltaX);
+
+    if (this.touchScrollState != null) {
+      this.touchScrollState.lastOffsetY = currentTouchY;
+      this.touchScrollState.lastDeltaY = deltaY;
+      this.touchScrollState.lastOffsetX = currentTouchX;
+      this.touchScrollState.lastDeltaX = deltaX;
+      return;
+    }
     this.touchScrollState = {
       lastOffsetY: currentTouchY,
       lastDeltaY: deltaY,
