@@ -1,6 +1,6 @@
 import { CELL_WIDTH } from "./cell";
-import { Row, RowComponent } from "./row";
-import { RowManager } from "./row-manager/row-manager";
+import { RowComponent } from "./row";
+import { RowManager, Rows } from "./row-manager/row-manager";
 import { Scrollbar } from "./scrollbar";
 import { TouchScrolling } from "./utils/touch-scroll";
 
@@ -39,14 +39,14 @@ export class Grid {
   windowWidth: number;
 
   container: HTMLDivElement;
-  rowComponentMap: Record<string, RowComponent>;
+  rowComponentMap: Record<number, RowComponent>;
 
   scrollbar: Scrollbar;
   rowManager: RowManager;
 
   viewportWidth: number;
   viewportHeight: number;
-  constructor(container: HTMLDivElement, rows: Row[]) {
+  constructor(container: HTMLDivElement, rows: Rows) {
     this.container = container;
     this.rowManager = new RowManager(this, rows);
 
@@ -61,8 +61,6 @@ export class Grid {
     this.windowHeight = window.innerHeight;
     this.windowWidth = window.innerWidth;
 
-    this.rowComponentMap = {};
-
     this.scrollbar = new Scrollbar(this);
     new TouchScrolling(this.container);
 
@@ -72,30 +70,23 @@ export class Grid {
     this.renderViewportRows();
   }
   getState = (): GridState => {
-    const rows = this.rowManager.getRows();
-    let numCells: number;
-    // console.log(rows);
-    if (rows.length === 0) {
-      numCells = 0;
-    } else {
-      numCells = rows[0].cells.length;
-    }
+    const numRows = this.rowManager.getNumRows();
 
     const cellsPerRow = Math.floor(this.viewportWidth / CELL_WIDTH) + 2;
-    const tableWidth = numCells * CELL_WIDTH ?? 0;
+    const tableWidth = this.rowManager.numCols * CELL_WIDTH ?? 0;
 
     // NOTE(gab): full viewport, and an additional row top and bottom to simulate scrolling
     const rowsPerViewport = Math.floor(this.viewportHeight / ROW_HEIGHT) + 2;
 
-    const tableHeight = rows.length * ROW_HEIGHT;
+    const tableHeight = numRows * ROW_HEIGHT;
 
     const startCell = Math.floor(this.offsetX / CELL_WIDTH);
-    const endCell = Math.min(startCell + cellsPerRow, numCells);
+    const endCell = Math.min(startCell + cellsPerRow, this.rowManager.numCols);
     const cellOffset = -Math.floor(this.offsetX % CELL_WIDTH);
 
     // NOTE(gab): start to end of rows to render, along with the row offset to simulate scrolling
     const startRow = Math.floor(this.offsetY / ROW_HEIGHT);
-    const endRow = Math.min(startRow + rowsPerViewport, rows.length);
+    const endRow = Math.min(startRow + rowsPerViewport, numRows);
     const rowOffset = -Math.floor(this.offsetY % ROW_HEIGHT);
 
     const scrollableHeight = Math.max(tableHeight - this.viewportHeight, 0);
@@ -183,20 +174,16 @@ export class Grid {
       cellsPerRow,
     };
   };
-  setRows = (rows: Row[]) => {
-    this.rowManager.rows = rows;
-    this.rowManager.computedRows = rows;
-    this.scrollbar.setScrollOffset({ y: this.offsetY, x: this.offsetX });
-    this.renderViewportRows();
-    this.scrollbar.refreshThumb();
-  };
   // TODO(gab): make readable
   renderViewportRows = () => {
     const state = this.getState();
-    const rows = this.rowManager.getRows();
+    const viewBuffer = this.rowManager.getViewBuffer().buffer;
+
     const renderRows: Record<string, true> = {};
+    const rowObj = this.rowManager.rowData.obj;
+
     for (let i = state.startRow; i < state.endRow; i++) {
-      const row = rows[i];
+      const row = rowObj[Atomics.load(viewBuffer, i)];
       if (row == null) {
         continue;
       }
@@ -213,8 +200,9 @@ export class Grid {
     }
 
     for (let i = state.startRow; i < state.endRow; i++) {
-      const row = rows[i];
+      const row = rowObj[Atomics.load(viewBuffer, i)];
       if (row == null) {
+        console.error("cannot find row", i);
         continue;
       }
 
@@ -253,14 +241,15 @@ export class Grid {
       delete this.rowComponentMap[row.rowState.key];
     }
   };
+  // TODO(gab): should only be done on X scroll, row reusing and creating a new row
   renderViewportCells = () => {
     const state = this.getState();
-    const rows = this.rowManager.getRows();
+    const viewBuffer = this.rowManager.getViewBuffer().buffer;
     for (let i = state.startRow; i < state.endRow; i++) {
-      const row = rows[i]!;
-      const rowComponent = this.rowComponentMap[row.key];
+      const rowComponent = this.rowComponentMap[Atomics.load(viewBuffer, i)];
       if (rowComponent == null) {
-        throw new Error("should exist. did you render rows first?");
+        console.error("row should exist. did you render rows first?");
+        continue;
       }
       rowComponent.renderCells();
     }
@@ -272,5 +261,10 @@ export class Grid {
     this.renderViewportRows();
     this.renderViewportCells();
     this.scrollbar.refreshThumb();
+  };
+  destroy = () => {
+    for (const key in this.rowComponentMap) {
+      this.rowComponentMap[key].destroy();
+    }
   };
 }
