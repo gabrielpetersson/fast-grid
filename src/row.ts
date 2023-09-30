@@ -2,13 +2,13 @@ import { CELL_WIDTH, Cell, CellComponent } from "./cell";
 import { Grid } from "./grid";
 
 export interface Row {
-  key: string;
+  key: number;
   cells: Cell[];
 }
 
 type RowState =
-  | { prerender: true; key: string; cells: Cell[] }
-  | { prerender: false; key: string; cells: Cell[]; offset: number };
+  | { prerender: true; key: number; cells: Cell[] }
+  | { prerender: false; key: number; cells: Cell[]; offset: number };
 
 export class RowComponent {
   el: HTMLDivElement;

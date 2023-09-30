@@ -5,23 +5,27 @@ import {
   FC,
   SetStateAction,
   Dispatch,
+  ReactNode,
 } from "react";
 import { Cell, Grid, Row } from "grid";
 import Stats from "stats.js";
 import clsx from "clsx";
 import { isTimeToYield, yieldControl } from "main-thread-scheduling";
+import { Rows } from "../../src/row-manager/row-manager";
 
 const N_COLS = 15;
 
 export const FastGrid = () => {
   const [grid, setGrid] = useState<Grid | null>(null);
   const [autoScroller, setAutoScroller] = useState<AutoScroller | null>(null);
-  const [sortToggle, setSortToggle] = useState<boolean>(true);
+  const [sortToggle, setSortToggle] = useState<
+    "ascending" | "descending" | null
+  >(null);
   const [isAutoScroll, setIsAutoScroll] = useState<boolean>(false);
   const [loadingRows, setLoadingRows] = useState<boolean>(false);
   const [isAutoFilter, setIsAutoFilter] = useState<boolean>(false);
   const [filterQuery, setFilterQuery] = useState<string>("");
-  const [rowCount, setRowCount] = useState<number>(100_000);
+  const [rowCount, setRowCount] = useState<number>(10_000);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -35,12 +39,17 @@ export const FastGrid = () => {
     console.info("Ms to intitialize grid:", performance.now() - t0);
     (window as any).grid = grid;
     setGrid(grid);
-    setAutoScroller(new AutoScroller(grid));
+    const autoScroller = new AutoScroller(grid);
+    setAutoScroller(autoScroller);
+    return () => {
+      grid.destroy();
+      autoScroller.stop();
+    };
   }, []);
 
   useEffect(() => {
     if (grid == null) return;
-    grid.rowManager.filterBy(filterQuery);
+    grid.rowManager.multithreadFilterBy(filterQuery);
   }, [filterQuery, grid]);
 
   useEffect(() => {
@@ -70,29 +79,33 @@ export const FastGrid = () => {
 
   const addRow = () => {
     if (grid == null) return;
-    const row = generateRow(grid.rowManager.rows.length);
-    grid.rowManager.rows.push(row);
-    const state = grid.getState();
-    grid.scrollbar.setScrollOffset({ y: state.scrollableHeight });
-    grid.renderViewportRows();
+    // const row = generateRow(Object.values(grid.rowManager.rows).length);
+    // grid.rowManager.rows[row.key] = row;
+    // const state = grid.getState();
+    // grid.scrollbar.setScrollOffset({ y: state.scrollableHeight });
+    // grid.renderViewportRows();
   };
 
   const reverseRows = () => {
+    window.alert("removed due to refactor, implementing soon");
     if (grid == null) return;
-    grid.rowManager.rows.reverse();
+    // grid.rowManager.reverse();
     grid.renderViewportRows();
   };
 
   const sortSecondColumn = () => {
     if (grid == null) return;
-    // TODO: move into lib and make non-blocking
-    grid.rowManager.rows = grid.rowManager.rows.sort((a, b) => {
-      const aVal = Number(a.cells[1]!.s);
-      const bVal = Number(b.cells[1]!.s);
-      return sortToggle ? aVal - bVal : bVal - aVal;
-    });
-    grid.renderViewportRows();
-    setSortToggle((p) => !p);
+    const dir = (() => {
+      if (sortToggle == null) {
+        return "descending";
+      }
+      if (sortToggle === "descending") {
+        return "ascending";
+      }
+      return null;
+    })();
+    grid.rowManager.multithreadSortBy(dir);
+    setSortToggle(dir);
   };
 
   const reset = () => {
@@ -151,6 +164,7 @@ export const FastGrid = () => {
       >
         <PrimaryButtons
           filterQuery={filterQuery}
+          sortToggle={sortToggle}
           isAutoFilter={isAutoFilter}
           isAutoScroll={isAutoScroll}
           addRow={addRow}
@@ -178,7 +192,7 @@ export const FastGrid = () => {
 const box = "shadow-[rgba(0,_0,_0,_0.1)_0px_0px_2px_1px]";
 
 interface ButtonProps {
-  children: string;
+  children: ReactNode;
   disabled?: boolean;
   onClick: () => void;
 }
@@ -199,6 +213,7 @@ const Button: FC<ButtonProps> = ({ disabled, children, onClick }) => {
 
 interface PrimaryButtonsProps {
   filterQuery: string;
+  sortToggle: "ascending" | "descending" | null;
   isAutoFilter: boolean;
   isAutoScroll: boolean;
   addRow: () => void;
@@ -210,6 +225,7 @@ interface PrimaryButtonsProps {
 }
 const PrimaryButtons: FC<PrimaryButtonsProps> = ({
   filterQuery,
+  sortToggle,
   isAutoFilter,
   isAutoScroll,
   addRow,
@@ -219,22 +235,31 @@ const PrimaryButtons: FC<PrimaryButtonsProps> = ({
   setIsAutoFilter,
   sortSecondColumn,
 }) => {
+  console.log(sortToggle);
   return (
     <>
-      <Button disabled={filterQuery !== "" || isAutoFilter} onClick={addRow}>
+      <Button
+        // disabled={filterQuery !== "" || isAutoFilter}
+        onClick={addRow}
+      >
         Add row
       </Button>
       <Button
-        disabled={filterQuery !== "" || isAutoFilter}
+        // disabled={filterQuery !== "" || isAutoFilter}
         onClick={reverseRows}
       >
         Reverse rows
       </Button>
       <Button
-        disabled={filterQuery !== "" || isAutoFilter}
+        // disabled={filterQuery !== "" || isAutoFilter}
         onClick={sortSecondColumn}
       >
         Sort second column
+        {sortToggle != null && (
+          <span className="material-symbols-outlined text-[13px]">
+            {sortToggle === "ascending" ? "arrow_upward" : "arrow_downward"}
+          </span>
+        )}
       </Button>
       <div
         className={clsx(
@@ -289,7 +314,6 @@ const SecondaryButtons: FC<SecondaryButtonsProps> = ({
   return (
     <>
       <select
-        name="exampleDropdown"
         value={rowCount}
         onChange={(e) => setRowCount(Number(e.target.value))}
         className={clsx(
@@ -297,6 +321,7 @@ const SecondaryButtons: FC<SecondaryButtonsProps> = ({
           box
         )}
       >
+        <option value={10}>10 rows</option>
         <option value={10_000}>10 000 rows</option>
         <option value={100_000}>100 000 rows</option>
         <option value={500_000}>500 000 rows</option>
@@ -359,20 +384,20 @@ const generateRow = (i: number): Row => {
       s: v, // TODO(gab): rm field, sorting on this for efficiency. will fix with separate number/string cells
     });
   }
-  return { key: String(i), cells };
+  return { key: i, cells };
 };
 
 const generateRows = async (rowCount: number, grid: Grid, cb: () => void) => {
-  const rowData: Row[] = [];
+  const rows: Rows = {};
   for (let i = 0; i < rowCount; i++) {
     if (i % 10000 === 0 && isTimeToYield("background")) {
-      grid.setRows(rowData);
+      // grid.rowManager.setRows(rows);
       await yieldControl("background");
     }
     const row = generateRow(i);
-    rowData.push(row);
+    rows[row.key] = row;
   }
-  grid.setRows(rowData);
+  grid.rowManager.setRows(rows);
   cb();
 };
 
