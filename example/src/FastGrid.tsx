@@ -25,7 +25,7 @@ export const FastGrid = () => {
   const [loadingRows, setLoadingRows] = useState<boolean>(false);
   const [isAutoFilter, setIsAutoFilter] = useState<boolean>(false);
   const [filterQuery, setFilterQuery] = useState<string>("");
-  const [rowCount, setRowCount] = useState<number>(10_000);
+  const [rowCount, setRowCount] = useState<number>(40);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -33,12 +33,18 @@ export const FastGrid = () => {
     if (container == null) {
       return;
     }
-    setupFPS();
+
+    // init grid
     const t0 = performance.now();
     const grid = new Grid(container, []);
-    console.info("Ms to intitialize grid:", performance.now() - t0);
-    (window as any).grid = grid;
     setGrid(grid);
+    console.info("Ms to intitialize grid:", performance.now() - t0);
+
+    // misc
+    (window as any).__grid = grid;
+    setupFPS();
+
+    // setup autoscroller
     const autoScroller = new AutoScroller(grid);
     setAutoScroller(autoScroller);
     return () => {
@@ -183,6 +189,9 @@ export const FastGrid = () => {
       </div>
       <div
         ref={containerRef} // attaching grid here
+        style={{
+          contain: "strict",
+        }}
         className="relative box-border w-full flex-1 overflow-clip border border-gray-700 bg-white"
       ></div>
     </>

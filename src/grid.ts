@@ -2,7 +2,7 @@ import { CELL_WIDTH } from "./cell";
 import { RowComponent } from "./row";
 import { RowManager, Rows } from "./row-manager/row-manager";
 import { Scrollbar } from "./scrollbar";
-import { TouchScrolling } from "./utils/touch-scroll";
+import { TouchScrolling as PhoneControls } from "./utils/touch-scroll";
 
 const ROW_HEIGHT = 32;
 
@@ -62,9 +62,8 @@ export class Grid {
     this.windowWidth = window.innerWidth;
 
     this.scrollbar = new Scrollbar(this);
-    new TouchScrolling(this.container);
+    new PhoneControls(this.container);
 
-    // window.addEventListener("resize", this.onResizeWindow);
     const observer = new ResizeObserver(this.onResize);
     observer.observe(container);
     this.renderViewportRows();
@@ -75,7 +74,7 @@ export class Grid {
     const cellsPerRow = Math.floor(this.viewportWidth / CELL_WIDTH) + 2;
     const tableWidth = this.rowManager.numCols * CELL_WIDTH ?? 0;
 
-    // NOTE(gab): full viewport, and an additional row top and bottom to simulate scrolling
+    // full viewport, and an additional row top and bottom to simulate scrolling
     const rowsPerViewport = Math.floor(this.viewportHeight / ROW_HEIGHT) + 2;
 
     const tableHeight = numRows * ROW_HEIGHT;
@@ -84,7 +83,7 @@ export class Grid {
     const endCell = Math.min(startCell + cellsPerRow, this.rowManager.numCols);
     const cellOffset = -Math.floor(this.offsetX % CELL_WIDTH);
 
-    // NOTE(gab): start to end of rows to render, along with the row offset to simulate scrolling
+    // start to end of rows to render, along with the row offset to simulate scrolling
     const startRow = Math.floor(this.offsetY / ROW_HEIGHT);
     const endRow = Math.min(startRow + rowsPerViewport, numRows);
     const rowOffset = -Math.floor(this.offsetY % ROW_HEIGHT);
@@ -94,7 +93,7 @@ export class Grid {
     const scrollThumbYPct =
       tableHeight === 0
         ? 1
-        : // NOTE(gab): makes thumb smaller slower, so that smaller changes in rows still slighly changes size
+        : // makes thumb smaller slower, so that smaller changes in rows still slighly changes size
           0.97 * Math.sqrt(this.viewportHeight / tableHeight) + 0.03;
 
     const thumbSizeY = Math.round(
@@ -127,7 +126,7 @@ export class Grid {
       (this.offsetX / scrollableWidth) * this.viewportWidth -
       thumbSizeX * (this.offsetX / scrollableWidth);
 
-    // todo: a bit dumb will fix. anyway fixes GC
+    // dumb but anyway it minimizes GC by not allocating a shit ton of pointers since these are all scalars
     if (this.state != null) {
       this.state.endRow = endRow;
       this.state.startRow = startRow;
@@ -174,8 +173,13 @@ export class Grid {
       cellsPerRow,
     };
   };
-  // TODO(gab): make readable
+
   renderViewportRows = () => {
+    // reusing DOM and updating only the least possible content. 3 steps:
+    // 1) see which rows goes out of viewport
+    // 2) see which rows comes into viewport. reuse rows if possible, otherwise create new DOM elements
+    // 3) remove rows from the DOM
+
     const state = this.getState();
     const viewBuffer = this.rowManager.getViewBuffer().buffer;
 
@@ -215,30 +219,25 @@ export class Grid {
 
       const reuseRow = removeRows.pop();
       if (reuseRow != null) {
-        delete this.rowComponentMap[reuseRow.rowState.key];
-        reuseRow.setRowState({
-          key: row.key,
-          prerender: false,
-          offset,
-          cells: row.cells,
-        });
+        delete this.rowComponentMap[reuseRow.key];
+        reuseRow.key = row.key;
+        reuseRow.cells = row.cells;
+        reuseRow.setOffset(offset);
+        reuseRow.renderCells();
         this.rowComponentMap[row.key] = reuseRow;
         continue;
       }
 
-      const rowComponent = new RowComponent(this, {
-        key: row.key,
-        prerender: false,
-        offset,
-        cells: row.cells,
-      });
+      const rowComponent = new RowComponent(this, row.key, row.cells, offset);
       this.container.appendChild(rowComponent.el);
       this.rowComponentMap[row.key] = rowComponent;
     }
 
     for (const row of removeRows) {
       row.destroy();
-      delete this.rowComponentMap[row.rowState.key];
+
+      console.log("remove");
+      delete this.rowComponentMap[row.key];
     }
   };
   // TODO(gab): should only be done on X scroll, row reusing and creating a new row
@@ -257,7 +256,8 @@ export class Grid {
   onResize = () => {
     this.viewportWidth = this.container.clientWidth;
     this.viewportHeight = this.container.clientHeight;
-    this.scrollbar.setScrollOffset({ x: this.offsetX, y: this.offsetY });
+    this.scrollbar.setScrollOffsetY(this.offsetY);
+    this.scrollbar.setScrollOffsetX(this.offsetX);
     this.renderViewportRows();
     this.renderViewportCells();
     this.scrollbar.refreshThumb();

@@ -89,33 +89,39 @@ export class Scrollbar {
       this.translateThumbY(state2.thumbOffsetY);
     }
   };
-  setScrollOffset = ({ x, y }: { x?: number; y?: number }) => {
+  setScrollOffsetX = (x: number) => {
     const state = this.grid.getState();
-    if (x != null) {
-      const clampedOffsetX = Math.max(0, Math.min(x, state.scrollableWidth));
-      this.grid.offsetX = clampedOffsetX;
-    }
-    if (y != null) {
-      const clampedOffsetY = Math.max(0, Math.min(y, state.scrollableHeight));
-      this.grid.offsetY = clampedOffsetY;
-    }
+    const clampedOffsetX = Math.max(0, Math.min(x, state.scrollableWidth));
+    this.grid.offsetX = clampedOffsetX;
+
     const state2 = this.grid.getState();
-    if (x != null) {
-      this.translateThumbX(state2.thumbOffsetX);
-    }
-    if (y != null) {
-      this.translateThumbY(state2.thumbOffsetY);
-    }
+    this.translateThumbX(state2.thumbOffsetX);
   };
-  scrollBy = ({ x, y }: { x?: number; y?: number }) => {
-    this.setScrollOffset({
-      x: x != null ? this.grid.offsetX + x : undefined,
-      y: y != null ? this.grid.offsetY + y : undefined,
-    });
-    if (y != null) {
+  setScrollOffsetY = (y: number) => {
+    const state = this.grid.getState();
+    const clampedOffsetY = Math.max(0, Math.min(y, state.scrollableHeight));
+    this.grid.offsetY = clampedOffsetY;
+
+    const state2 = this.grid.getState();
+    this.translateThumbY(state2.thumbOffsetY);
+  };
+  scrollBy = (x?: number, y?: number) => {
+    let renderRows = false;
+    let renderCells = false;
+
+    if (y != null && y !== 0) {
+      this.setScrollOffsetY(this.grid.offsetY + y);
+      renderRows = true;
+    }
+    if (x != null && x !== 0) {
+      this.setScrollOffsetX(this.grid.offsetX + x);
+      renderCells = true;
+    }
+
+    if (renderRows) {
       this.grid.renderViewportRows();
     }
-    if (x != null) {
+    if (renderCells) {
       this.grid.renderViewportCells();
     }
   };
@@ -144,16 +150,15 @@ export class Scrollbar {
     // once every frame. useses transient scrolling to keep track of
     // intermediate scroll offsets
     window.requestAnimationFrame(() => {
-      this.scrollBy({
-        x:
-          this.transientScrollOffsetX != 0
-            ? this.transientScrollOffsetX
-            : undefined,
-        y:
-          this.transientScrollOffsetY != 0
-            ? this.transientScrollOffsetY
-            : undefined,
-      });
+      const scrollX =
+        this.transientScrollOffsetX != 0
+          ? this.transientScrollOffsetX
+          : undefined;
+      const scrollY =
+        this.transientScrollOffsetY != 0
+          ? this.transientScrollOffsetY
+          : undefined;
+      this.scrollBy(scrollX, scrollY);
       this.isScrolling = false;
       this.transientScrollOffsetX = 0;
       this.transientScrollOffsetY = 0;
@@ -180,7 +185,7 @@ export class Scrollbar {
 
     this.isScrolling = true;
     window.requestAnimationFrame(() => {
-      this.scrollBy({ y: this.transientScrollOffsetY });
+      this.scrollBy(undefined, this.transientScrollOffsetY);
       this.isScrolling = false;
       this.transientScrollOffsetY = 0;
     });
@@ -191,7 +196,7 @@ export class Scrollbar {
     document.removeEventListener("mouseup", this.onThumbMouseUpY);
     this.isScrolling = false;
     if (this.transientScrollOffsetY > 0) {
-      this.scrollBy({ y: this.transientScrollOffsetY });
+      this.scrollBy(undefined, this.transientScrollOffsetY);
     }
     this.transientScrollOffsetY = 0;
   };
@@ -215,7 +220,7 @@ export class Scrollbar {
 
     this.isScrolling = true;
     window.requestAnimationFrame(() => {
-      this.scrollBy({ x: this.transientScrollOffsetX });
+      this.scrollBy(this.transientScrollOffsetX, undefined);
       this.isScrolling = false;
       this.transientScrollOffsetX = 0;
     });
@@ -227,7 +232,7 @@ export class Scrollbar {
     this.isScrolling = false;
     // NOTE(gab): makes sure the last cancelled scroll events are applied, if any
     if (this.transientScrollOffsetX > 0) {
-      this.scrollBy({ x: this.transientScrollOffsetX });
+      this.scrollBy(this.transientScrollOffsetX, undefined);
     }
     this.transientScrollOffsetX = 0;
   };
@@ -242,7 +247,7 @@ export class Scrollbar {
     const state = this.grid.getState();
     const relativeOffset =
       (e.offsetY / this.grid.viewportHeight) * state.tableHeight;
-    this.setScrollOffset({ y: relativeOffset });
+    this.setScrollOffsetY(relativeOffset);
     this.grid.renderViewportRows();
   };
   onTrackMouseDownX = (e: MouseEvent) => {
@@ -250,7 +255,7 @@ export class Scrollbar {
     const state = this.grid.getState();
     const relativeOffset =
       (e.offsetX / this.grid.viewportWidth) * state.tableWidth;
-    this.setScrollOffset({ x: relativeOffset });
+    this.setScrollOffsetX(relativeOffset);
     this.grid.renderViewportCells();
   };
   translateThumbY = (offset: number) => {
