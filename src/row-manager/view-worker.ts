@@ -7,105 +7,100 @@ console.log("Worker initialized");
 
 export const letOtherEventsThrough = () => wait(0);
 
-let rowData: RowData = {
-  obj: {},
-  arr: [],
-  version: Date.now(),
-};
-
-let currentFilterId: [number] = [0];
-
-interface FilterRows {
-  rowsArr: Row[];
-  buffer: Int32Array;
-  query: string;
-  rowsPerViewport: number;
-  onEarlyResults: (rows: Row[]) => void;
-  shouldCancel: () => boolean;
-}
 export const filterRows = async ({
+  query,
+  column,
   rowsArr,
   buffer,
-  query,
-  //   rowsPerViewport,
-  //   onEarlyResults,
   shouldCancel,
-}: FilterRows): Promise<Result<{ numRows: number }>> => {
+  onEarlyResults,
+}: {
+  query: string;
+  column: number;
+  rowsArr: Row[];
+  buffer: Int32Array;
+  shouldCancel: () => boolean;
+  onEarlyResults: (numRows: number) => void;
+}): Promise<Result<{ numRows: number }>> => {
+  // minimum ms until we return early results. scrolling is clamped so if we return like only viewport we'd always
+  // go back to the top again while filtering from the middle
+  const MIN_MS_EARLY_RESULT = 30;
+  const MIN_RESULTS_EARLY_RESULT = 32;
   const ROW_CHUNK_SIZE = 30000;
-  // const filteredRows: Row[] = [];
+
   const numChunks = Math.ceil(rowsArr.length / ROW_CHUNK_SIZE);
+  const start = performance.now();
+  let sentEarlyResults = false;
   let offset = 0;
-  // let hasShownFirstResult = false;
+
   for (let chunkIndex = 0; chunkIndex < numChunks; chunkIndex++) {
     const startIndex = chunkIndex * ROW_CHUNK_SIZE;
     const endIndex = Math.min(startIndex + ROW_CHUNK_SIZE, rowsArr.length);
+
+    const timeSinceStart = performance.now() - start;
 
     await letOtherEventsThrough();
     if (shouldCancel()) {
       return { ok: false, error: "filter-cancelled" };
     }
 
+    if (
+      !sentEarlyResults &&
+      timeSinceStart > MIN_MS_EARLY_RESULT &&
+      offset > MIN_RESULTS_EARLY_RESULT
+    ) {
+      // makes filtering look super fast
+      onEarlyResults(offset);
+      sentEarlyResults = true;
+    }
+
     for (let i = startIndex; i < endIndex; i++) {
-      const row = rowData.arr[i]!;
+      const row = rowsArr[i]!;
       // NOTE(gab): indexOf is faster than includes
-      if (row.cells[1]!.value.indexOf(query) > -1) {
-        // buffer[offset] = row.key;
-        Atomics.store(buffer, i, row.key);
+      if (row.cells[column]!.text.indexOf(query) > -1) {
+        // buffer[offset] = row.id;
+        Atomics.store(buffer, offset, row.id);
         offset += 1;
       }
     }
-
-    // NOTE(gab): shows first results asap, but make sure they fill the viewport so rows are
-    // not loading in in batches
-    // const fillsViewport = filteredRows.length > rowsPerViewport;
-    // const showEarlyResults = chunkIndex % 100 === 0 || !hasShownFirstResult;
-    // if (showEarlyResults && fillsViewport) {
-    //   hasShownFirstResult = true;
-    //   onEarlyResults(filteredRows);
-    // }
   }
   return { ok: true, value: { numRows: offset } };
 };
 
-let sortCache: Row[] | null = null;
-
-interface ComputeViewParams {
-  rowData: RowData;
-  buffer: Int32Array;
-  viewConfig: View;
-  recompute: { sort: boolean; filter: boolean };
-  rowsPerViewport: number;
-  onEarlyResults: (rows: Row[]) => void;
-  shouldCancel: () => boolean;
-}
 export const computeView = async ({
   rowData,
   buffer,
   viewConfig,
-  recompute,
-  //   rowsPerViewport,
-  //   onEarlyResults,
+  useCachedSort,
   shouldCancel,
-}: ComputeViewParams): Promise<number | "cancelled"> => {
-  const t2 = performance.now();
+}: {
+  rowData: RowData;
+  buffer: Int32Array;
+  viewConfig: View;
+  useCachedSort: boolean;
+  shouldCancel: () => boolean;
+}): Promise<number | "cancelled"> => {
   let rowsArr = rowData.arr;
-  if (recompute.sort && viewConfig.sort != null) {
-    rowsArr = [...rowData.arr];
+  if (!useCachedSort && viewConfig.sort != null) {
+    const start = performance.now();
+    rowsArr = [...rowData.arr]; // todo: can use a global array reference here and manually check if all references are the same still
     const direction = viewConfig.sort.direction;
     const col = viewConfig.sort.column;
     const comp = (() => {
       if (direction === "ascending") {
-        return (a: Row, b: Row) => (a.cells[col].s > b.cells[col].s ? 1 : -1);
+        return (a: Row, b: Row) =>
+          a.cells[col].val > b.cells[col].val ? 1 : -1;
       }
-      return (a: Row, b: Row) => (a.cells[col].s < b.cells[col].s ? 1 : -1);
+      return (a: Row, b: Row) => (a.cells[col].val < b.cells[col].val ? 1 : -1);
     })();
     const res = await timSort(rowsArr, comp, shouldCancel);
     sortCache = rowsArr;
-    console.log("sorting ms", performance.now() - t2);
+    console.log("sorting happened, ms", performance.now() - start);
     if (!res.ok) {
       return "cancelled";
     }
-  } else if (viewConfig.sort != null && sortCache != null) {
+  } else if (viewConfig.sort == null && sortCache != null) {
+    console.log("using sort cache");
     rowsArr = sortCache;
   }
 
@@ -115,30 +110,43 @@ export const computeView = async ({
   }
 
   // TODO(gab): remove hardcode for column 2
-  const filterQuery = viewConfig.filter.find((f) => f.column === 2)?.query;
-  if (!recompute.filter || filterQuery == null) {
+  const filter = viewConfig.filter[0]; //.find((f) => f.column === 1);
+  if (filter == null) {
+    const start = performance.now();
     for (let i = 0; i < rowsArr.length; i++) {
       // buffer[i] = rowsArr[i]!.key;
-      Atomics.store(buffer, i, rowsArr[i]!.key);
+      Atomics.store(buffer, i, rowsArr[i]!.id);
     }
+    console.log(
+      "returning early after sort, wrote buffer ms:",
+      performance.now() - start
+    );
     return rowsArr.length;
   }
 
+  const start = performance.now();
   const result = await filterRows({
-    query: filterQuery,
+    query: filter.query,
+    column: filter.column,
     buffer,
     rowsArr,
-    rowsPerViewport: 32,
-    shouldCancel,
-    onEarlyResults: () => {
-      return false;
+    onEarlyResults: (numRows: number) => {
+      self.postMessage({ type: "compute-view-done", numRows });
     },
+    shouldCancel,
   });
 
   await letOtherEventsThrough();
   if (shouldCancel() || !result.ok) {
     return "cancelled";
   }
+
+  console.log(
+    "filtering happened, num rows:",
+    result.value.numRows,
+    "ms:",
+    performance.now() - start
+  );
   return result.value.numRows;
 
   // ### SORTING EXPERIMENTS ###
@@ -172,14 +180,20 @@ export const computeView = async ({
   // console.log(`Uint32Array sort took ${end - start}ms`);
 };
 
-console.log("LOADED WORKER");
+let rowData: RowData = {
+  obj: {},
+  arr: [],
+  version: Date.now(),
+};
+
+let currentFilterId: [number] = [0];
+
+let sortCache: Row[] | null = null;
+
 const handleEvent = async (event: Message) => {
-  console.log(this);
-  console.log("EVENT");
   const message = event.data;
   switch (message.type) {
     case "compute-view": {
-      console.log("start");
       currentFilterId[0] = message.viewConfig.version;
       const shouldCancel = () => {
         if (message.viewConfig.version !== currentFilterId[0]) {
@@ -193,16 +207,12 @@ const handleEvent = async (event: Message) => {
       };
       const numRows = await computeView({
         viewConfig: message.viewConfig,
-        recompute: message.recompute,
+        useCachedSort: message.useCachedSort ?? false,
         buffer: message.viewBuffer,
         rowData,
-        rowsPerViewport: 32,
         shouldCancel,
-        onEarlyResults: () => {
-          return false;
-        },
       });
-      console.log("bef1");
+
       // NOTE(gab): let other events stream through & check if any of them invalidates this one
       await letOtherEventsThrough();
       if (shouldCancel() || numRows === "cancelled") {
@@ -210,7 +220,7 @@ const handleEvent = async (event: Message) => {
         self.postMessage({ type: "compute-view-cancelled" });
         return;
       }
-      console.log("done1");
+
       self.postMessage({ type: "compute-view-done", numRows });
       return;
     }
@@ -220,27 +230,33 @@ const handleEvent = async (event: Message) => {
         arr: Object.values(message.rows),
         version: Date.now(),
       };
+      sortCache = null;
       return;
     }
   }
 };
 
-interface FilterEvent {
+export type ComputeViewEvent = {
   type: "compute-view";
   viewBuffer: Int32Array;
   viewConfig: View;
-  recompute: {
-    filter: boolean;
-    sort: boolean;
-  };
-}
-interface SetRowsEvent {
+  useCachedSort?: boolean;
+};
+
+export type SetRowsEvent = {
   type: "set-rows";
   rows: Rows;
-}
-type Message = MessageEvent<FilterEvent | SetRowsEvent>;
+};
+
+export type Message = MessageEvent<ComputeViewEvent | SetRowsEvent>;
+
 self.addEventListener("message", (event: Message) => {
-  console.log("got new event", event.data.type);
+  if (event.data.type === "compute-view") {
+    const { viewBuffer, ...rest } = event.data;
+    console.log("got new event", JSON.stringify(rest, null, 4), viewBuffer);
+  } else {
+    console.log("got event", JSON.stringify(event, null, 4));
+  }
   // NOTE(gab): messsages are handled sync & is blocking, so need to exit the event loop asap
   handleEvent(event);
 });

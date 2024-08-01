@@ -38,7 +38,7 @@ export const filterRows = async ({
     for (let i = startIndex; i < endIndex; i++) {
       const row = rows[i]!;
       // NOTE(gab): indexOf is faster than includes
-      if (row.cells[1]!.value.indexOf(query) > -1) {
+      if (row.cells[1]!.text.indexOf(query) > -1) {
         filteredRows.push(row);
       }
     }

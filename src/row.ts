@@ -2,21 +2,21 @@ import { CELL_WIDTH, Cell, CellComponent } from "./cell";
 import { Grid } from "./grid";
 
 export interface Row {
-  key: number;
+  id: number;
   cells: Cell[];
 }
 
 export class RowComponent {
+  id: number;
   el: HTMLDivElement;
-  key: number;
   cells: Cell[];
   _offset: number;
 
   cellComponentMap: Record<string, CellComponent>;
   grid: Grid;
-  constructor(grid: Grid, key: number, cells: Cell[], _offset: number) {
+  constructor(grid: Grid, id: number, cells: Cell[], _offset: number) {
     this.grid = grid;
-    this.key = key;
+    this.id = id;
     this.cells = cells;
     this._offset = _offset;
     this.cellComponentMap = {};
@@ -49,15 +49,15 @@ export class RowComponent {
     const renderCells: Record<string, true> = {};
     for (let i = state.startCell; i < state.endCell; i++) {
       const cell = this.cells[i];
-      renderCells[cell.key] = true;
+      renderCells[cell.id] = true;
     }
 
     const removeCells: CellComponent[] = [];
-    for (const key in this.cellComponentMap) {
-      if (key in renderCells) {
+    for (const id in this.cellComponentMap) {
+      if (id in renderCells) {
         continue;
       }
-      const cell = this.cellComponentMap[key]!;
+      const cell = this.cellComponentMap[id]!;
       removeCells.push(cell);
     }
 
@@ -65,7 +65,7 @@ export class RowComponent {
       const cell = this.cells[i]!;
       const offset = state.cellOffset + (i - state.startCell) * CELL_WIDTH;
 
-      const existingCell = this.cellComponentMap[cell.key];
+      const existingCell = this.cellComponentMap[cell.id];
       if (existingCell != null) {
         existingCell.setOffset(offset);
         continue;
@@ -73,20 +73,20 @@ export class RowComponent {
 
       const reuseCell = removeCells.pop();
       if (reuseCell != null) {
-        delete this.cellComponentMap[reuseCell.cellRef.key];
+        delete this.cellComponentMap[reuseCell.cellRef.id];
         reuseCell.setValue(cell);
         reuseCell.setOffset(offset);
-        this.cellComponentMap[reuseCell.cellRef.key] = reuseCell;
+        this.cellComponentMap[reuseCell.cellRef.id] = reuseCell;
         continue;
       }
 
       const newCell = new CellComponent(offset, cell);
       this.el.appendChild(newCell.el);
-      this.cellComponentMap[newCell.cellRef.key] = newCell;
+      this.cellComponentMap[newCell.cellRef.id] = newCell;
     }
 
     for (const cell of removeCells) {
-      delete this.cellComponentMap[cell.cellRef.key];
+      delete this.cellComponentMap[cell.cellRef.id];
       this.el.removeChild(cell.el);
     }
   }

@@ -2,10 +2,9 @@
 export const CELL_WIDTH = 150;
 
 export interface Cell {
-  type: "string" | "enum";
-  value: string;
-  s: number;
-  key: string;
+  id: number;
+  text: string;
+  val: number;
 }
 
 // class EnumCell {
@@ -66,7 +65,7 @@ export class CellComponent {
   }
   setValue(cellRef: Cell) {
     this.cellRef = cellRef;
-    this.el.innerText = cellRef.value;
+    this.el.innerText = cellRef.text;
   }
   setOffset(offset: number, force: boolean = false) {
     if (force || offset !== this._offset) {

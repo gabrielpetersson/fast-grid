@@ -1,11 +1,11 @@
 import { Grid } from "../grid";
 import { Row } from "../row";
+import { ComputeViewEvent, SetRowsEvent } from "./view-worker";
 import ViewWorker from "./view-worker?worker";
 
 const viewWorker = new ViewWorker();
-console.log(viewWorker);
 
-export type Rows = { [key: number]: Row };
+export type Rows = { [id: number]: Row };
 
 // const prevFilterMs: number[] = [];
 
@@ -60,7 +60,7 @@ export class RowManager {
       version: Date.now(),
     };
 
-    viewWorker.postMessage({ type: "set-rows", rows });
+    viewWorker.postMessage({ type: "set-rows", rows } satisfies SetRowsEvent);
 
     const sharedBuffer = new SharedArrayBuffer(
       1_000_000 * Int32Array.BYTES_PER_ELEMENT
@@ -70,8 +70,8 @@ export class RowManager {
     const noFilterBuffer = new Int32Array(
       1_000_000 * Int32Array.BYTES_PER_ELEMENT
     );
-    for (const key in rows) {
-      noFilterBuffer[key] = Number(key);
+    for (const id in rows) {
+      noFilterBuffer[id] = Number(id);
     }
     this.noViewBuffer = {
       buffer: noFilterBuffer,
@@ -110,7 +110,7 @@ export class RowManager {
     this.rowData = { obj: rows, arr: Object.values(rows), version: Date.now() };
 
     for (let i = 0; i < this.rowData.arr.length; i++) {
-      this.noViewBuffer.buffer[i] = this.rowData.arr[i].key;
+      this.noViewBuffer.buffer[i] = this.rowData.arr[i].id;
     }
 
     this.noViewBuffer = {
@@ -127,7 +127,10 @@ export class RowManager {
     // TODO: this is blocking wtf, gotta split this up
     setTimeout(() => {
       const t0 = performance.now();
-      viewWorker.postMessage({ type: "set-rows", rows: this.rowData.obj });
+      viewWorker.postMessage({
+        type: "set-rows",
+        rows: this.rowData.obj,
+      } satisfies SetRowsEvent);
       console.log("Ms to send rows to worker", performance.now() - t0);
     });
   };
@@ -184,25 +187,29 @@ export class RowManager {
   // };
 
   updateFilterOrCreateNew = (query: string) => {
-    // TODO(gab): hardcoded to column 2 for now
-    const filter = this.view.filter.find((f) => f.column === 2);
+    const filter = this.view.filter.find((f) => f.column === FILTER_COL);
     if (filter != null) {
       filter.query = query;
     } else {
       this.view.filter.push({
         type: "string",
-        column: 2,
+        column: FILTER_COL,
         query,
       });
     }
   };
 
   multithreadFilterBy = async (query: string) => {
-    console.count("----------");
+    console.count("---------- start filter");
     this.view.version = Date.now();
     if (query === "") {
-      const filterIndex = this.view.filter.findIndex((f) => f.column === 2);
+      // hack for only filtering one col for now
+      const filterIndex = this.view.filter.findIndex(
+        (f) => f.column === FILTER_COL
+      );
       this.view.filter.splice(filterIndex, 1);
+      // ----------------
+
       this.grid.renderViewportRows();
       this.grid.renderViewportCells();
       this.grid.scrollbar.refreshThumb();
@@ -214,12 +221,9 @@ export class RowManager {
     viewWorker.postMessage({
       type: "compute-view",
       viewConfig: this.view,
-      recompute: {
-        filter: true,
-        sort: false,
-      },
       viewBuffer: this.viewBuffer.buffer,
-    });
+      useCachedSort: true,
+    } satisfies ComputeViewEvent);
   };
   multithreadSortBy = async (sort: "ascending" | "descending" | null) => {
     this.view.version = Date.now();
@@ -231,17 +235,17 @@ export class RowManager {
       return;
     }
     this.view.sort = {
-      column: 2,
+      column: SORT_COL,
       direction: sort,
     };
     viewWorker.postMessage({
       type: "compute-view",
       viewConfig: this.view,
-      recompute: {
-        filter: true,
-        sort: true,
-      },
       viewBuffer: this.viewBuffer.buffer,
-    });
+    } satisfies ComputeViewEvent);
   };
 }
+
+// temporary while i dont have multi column views. these are  columnindexes to be computed for sort/filter
+export const FILTER_COL = 1;
+export const SORT_COL = 1;
