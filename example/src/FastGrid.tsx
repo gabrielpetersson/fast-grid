@@ -380,31 +380,26 @@ function skewedRandom() {
   return 1 - a;
 }
 
-const generateRow = (i: number): Row => {
-  const cells: Cell[] = [
-    { type: "string", value: String(i + 1), key: `${i}-index`, s: i },
-  ];
-  for (let j = 0; j < N_COLS; j++) {
-    const v = Math.round(skewedRandom() * 100000000);
-    cells.push({
-      type: "string",
-      value: String(v),
-      key: `${i}-${j}`,
-      s: v, // TODO(gab): rm field, sorting on this for efficiency. will fix with separate number/string cells
-    });
-  }
-  return { key: i, cells };
-};
-
 const generateRows = async (rowCount: number, grid: Grid, cb: () => void) => {
   const rows: Rows = {};
+  let cellIndex = 0;
   for (let i = 0; i < rowCount; i++) {
     if (i % 10000 === 0 && isTimeToYield("background")) {
       // grid.rowManager.setRows(rows);
       await yieldControl("background");
     }
-    const row = generateRow(i);
-    rows[row.key] = row;
+    const cells: Cell[] = [{ id: -i - 1, text: String(i + 1), val: i }];
+    for (let j = 0; j < N_COLS; j++) {
+      const v = Math.round(skewedRandom() * 100000000);
+      cells.push({
+        id: cellIndex,
+        text: String(v),
+        val: v, // TODO(gab): rm field, sorting on this for efficiency. will fix with separate number/string cells
+      });
+      cellIndex += 1;
+    }
+    const row = { id: i, cells } satisfies Row;
+    rows[row.id] = row;
   }
   grid.rowManager.setRows(rows);
   cb();

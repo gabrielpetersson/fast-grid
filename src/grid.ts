@@ -191,27 +191,28 @@ export class Grid {
       if (row == null) {
         continue;
       }
-      renderRows[row.key] = true;
+      renderRows[row.id] = true;
     }
 
     const removeRows: RowComponent[] = [];
-    for (const key in this.rowComponentMap) {
-      if (key in renderRows) {
+    for (const id in this.rowComponentMap) {
+      if (id in renderRows) {
         continue;
       }
-      const rowComponent = this.rowComponentMap[key]!;
+      const rowComponent = this.rowComponentMap[id]!;
       removeRows.push(rowComponent);
     }
 
     for (let i = state.startRow; i < state.endRow; i++) {
       const row = rowObj[Atomics.load(viewBuffer, i)];
+      // const row = rowObj[viewBuffer[i]
       if (row == null) {
         console.error("cannot find row", i);
         continue;
       }
 
       const offset = state.rowOffset + (i - state.startRow) * ROW_HEIGHT;
-      const existingRow = this.rowComponentMap[row.key];
+      const existingRow = this.rowComponentMap[row.id];
       if (existingRow != null) {
         existingRow.setOffset(offset);
         continue;
@@ -219,25 +220,23 @@ export class Grid {
 
       const reuseRow = removeRows.pop();
       if (reuseRow != null) {
-        delete this.rowComponentMap[reuseRow.key];
-        reuseRow.key = row.key;
+        delete this.rowComponentMap[reuseRow.id];
+        reuseRow.id = row.id;
         reuseRow.cells = row.cells;
         reuseRow.setOffset(offset);
         reuseRow.renderCells();
-        this.rowComponentMap[row.key] = reuseRow;
+        this.rowComponentMap[row.id] = reuseRow;
         continue;
       }
 
-      const rowComponent = new RowComponent(this, row.key, row.cells, offset);
+      const rowComponent = new RowComponent(this, row.id, row.cells, offset);
       this.container.appendChild(rowComponent.el);
-      this.rowComponentMap[row.key] = rowComponent;
+      this.rowComponentMap[row.id] = rowComponent;
     }
 
     for (const row of removeRows) {
       row.destroy();
-
-      console.log("remove");
-      delete this.rowComponentMap[row.key];
+      delete this.rowComponentMap[row.id];
     }
   };
   // TODO(gab): should only be done on X scroll, row reusing and creating a new row
@@ -263,8 +262,8 @@ export class Grid {
     this.scrollbar.refreshThumb();
   };
   destroy = () => {
-    for (const key in this.rowComponentMap) {
-      this.rowComponentMap[key].destroy();
+    for (const id in this.rowComponentMap) {
+      this.rowComponentMap[id].destroy();
     }
   };
 }
