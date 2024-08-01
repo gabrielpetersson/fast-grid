@@ -6,29 +6,25 @@ export interface Row {
   cells: Cell[];
 }
 
-type RowState =
-  | { prerender: true; key: number; cells: Cell[] }
-  | { prerender: false; key: number; cells: Cell[]; offset: number };
-
 export class RowComponent {
   el: HTMLDivElement;
-  rowState: RowState;
-  cellComponentMap: Record<string, CellComponent>;
+  key: number;
+  cells: Cell[];
+  _offset: number;
 
+  cellComponentMap: Record<string, CellComponent>;
   grid: Grid;
-  constructor(grid: Grid, rowState: RowState) {
+  constructor(grid: Grid, key: number, cells: Cell[], _offset: number) {
     this.grid = grid;
-    this.rowState = rowState;
+    this.key = key;
+    this.cells = cells;
+    this._offset = _offset;
     this.cellComponentMap = {};
 
     this.el = document.createElement("div");
     this.el.className = "absolute top-0 h-[32px]";
 
-    if (rowState.prerender) {
-      this.prerenderRow();
-    } else {
-      this.renderRow(rowState.offset);
-    }
+    this.setOffset(_offset, true);
     this.renderCells();
   }
   destroy() {
@@ -41,23 +37,18 @@ export class RowComponent {
       console.error("row component already removed");
     }
   }
-  setOffset(offset: number) {
-    this.el.style.transform = `translateY(${offset}px)`;
-  }
-  prerenderRow() {
-    // TODO(gab): set to negative row height or something
-    // should be able to set like this.el.style.contain = "content"; here?
-    this.setOffset(-3000);
-  }
-  renderRow(offset: number) {
-    this.setOffset(offset);
+  setOffset(offset: number, force: boolean = false) {
+    if (force || offset != this._offset) {
+      this.el.style.transform = `translateY(${offset}px)`;
+    }
+    this._offset = offset;
   }
   renderCells() {
     const state = this.grid.getState();
 
     const renderCells: Record<string, true> = {};
     for (let i = state.startCell; i < state.endCell; i++) {
-      const cell = this.rowState.cells[i];
+      const cell = this.cells[i];
       renderCells[cell.key] = true;
     }
 
@@ -71,10 +62,10 @@ export class RowComponent {
     }
 
     for (let i = state.startCell; i < state.endCell; i++) {
-      const value = this.rowState.cells[i]!;
+      const cell = this.cells[i]!;
       const offset = state.cellOffset + (i - state.startCell) * CELL_WIDTH;
 
-      const existingCell = this.cellComponentMap[value.key];
+      const existingCell = this.cellComponentMap[cell.key];
       if (existingCell != null) {
         existingCell.setOffset(offset);
         continue;
@@ -82,31 +73,21 @@ export class RowComponent {
 
       const reuseCell = removeCells.pop();
       if (reuseCell != null) {
-        delete this.cellComponentMap[reuseCell.value.key];
-        reuseCell.setValue(value, i);
+        delete this.cellComponentMap[reuseCell.cellRef.key];
+        reuseCell.setValue(cell);
         reuseCell.setOffset(offset);
-        this.cellComponentMap[reuseCell.value.key] = reuseCell;
+        this.cellComponentMap[reuseCell.cellRef.key] = reuseCell;
         continue;
       }
 
-      const newCell = new CellComponent(this, value, i);
+      const newCell = new CellComponent(offset, cell);
       this.el.appendChild(newCell.el);
-      this.cellComponentMap[newCell.value.key] = newCell;
-      newCell.setOffset(offset);
+      this.cellComponentMap[newCell.cellRef.key] = newCell;
     }
 
     for (const cell of removeCells) {
-      cell.destroy();
-      delete this.cellComponentMap[cell.value.key];
+      delete this.cellComponentMap[cell.cellRef.key];
+      this.el.removeChild(cell.el);
     }
-  }
-  setRowState(rowState: RowState) {
-    this.rowState = rowState;
-    if (rowState.prerender) {
-      this.prerenderRow();
-    } else {
-      this.renderRow(rowState.offset);
-    }
-    this.renderCells();
   }
 }

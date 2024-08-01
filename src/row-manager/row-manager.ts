@@ -3,6 +3,7 @@ import { Row } from "../row";
 import ViewWorker from "./view-worker?worker";
 
 const viewWorker = new ViewWorker();
+console.log(viewWorker);
 
 export type Rows = { [key: number]: Row };
 
@@ -21,7 +22,7 @@ export interface Sort {
   direction: "ascending" | "descending";
 }
 
-export interface ViewConfig {
+export interface View {
   filter: Filter[];
   // TODO(gab): multi column sort
   sort: Sort | null;
@@ -43,7 +44,7 @@ export class RowManager {
   rowData: RowData;
   numCols: number;
   grid: Grid;
-  viewConfig: ViewConfig;
+  view: View;
   currentFilterId: number;
   viewBuffer: RowBuffer;
   noViewBuffer: RowBuffer;
@@ -53,7 +54,7 @@ export class RowManager {
     this.numCols = rows[0]?.cells.length ?? 0;
 
     this.currentFilterId = 0;
-    this.viewConfig = {
+    this.view = {
       filter: [],
       sort: null,
       version: Date.now(),
@@ -94,7 +95,7 @@ export class RowManager {
     };
   }
   isView = () => {
-    return this.viewConfig.filter.length !== 0 || this.viewConfig.sort != null;
+    return this.view.filter.length !== 0 || this.view.sort != null;
   };
   getViewBuffer = (): RowBuffer => {
     if (this.isView()) {
@@ -118,10 +119,8 @@ export class RowManager {
     };
     this.numCols = this.rowData.arr[0]?.cells.length ?? 0;
 
-    this.grid.scrollbar.setScrollOffset({
-      y: this.grid.offsetY,
-      x: this.grid.offsetX,
-    });
+    this.grid.scrollbar.setScrollOffsetY(this.grid.offsetY);
+    this.grid.scrollbar.setScrollOffsetX(this.grid.offsetX);
     this.grid.renderViewportRows();
     this.grid.scrollbar.refreshThumb();
 
@@ -183,33 +182,38 @@ export class RowManager {
   //     prevFilterMs.reduce((a, b) => a + b, 0) / prevFilterMs.length;
   //   console.log(`Filtering took ${ms}. Avg: ${avgFilterMs}`);
   // };
-  multithreadFilterBy = async (query: string) => {
-    console.count("----------");
-    this.viewConfig.version = Date.now();
-    if (query === "") {
-      const filterIndex = this.viewConfig.filter.findIndex(
-        (f) => f.column === 2
-      );
-      this.viewConfig.filter.splice(filterIndex, 1);
-      this.grid.renderViewportRows();
-      this.grid.renderViewportCells();
-      this.grid.scrollbar.refreshThumb();
-      return;
-    }
+
+  updateFilterOrCreateNew = (query: string) => {
     // TODO(gab): hardcoded to column 2 for now
-    const filter = this.viewConfig.filter.find((f) => f.column === 2);
+    const filter = this.view.filter.find((f) => f.column === 2);
     if (filter != null) {
       filter.query = query;
     } else {
-      this.viewConfig.filter.push({
+      this.view.filter.push({
         type: "string",
         column: 2,
         query,
       });
     }
+  };
+
+  multithreadFilterBy = async (query: string) => {
+    console.count("----------");
+    this.view.version = Date.now();
+    if (query === "") {
+      const filterIndex = this.view.filter.findIndex((f) => f.column === 2);
+      this.view.filter.splice(filterIndex, 1);
+      this.grid.renderViewportRows();
+      this.grid.renderViewportCells();
+      this.grid.scrollbar.refreshThumb();
+      return;
+    }
+
+    this.updateFilterOrCreateNew(query);
+
     viewWorker.postMessage({
       type: "compute-view",
-      viewConfig: this.viewConfig,
+      viewConfig: this.view,
       recompute: {
         filter: true,
         sort: false,
@@ -218,21 +222,21 @@ export class RowManager {
     });
   };
   multithreadSortBy = async (sort: "ascending" | "descending" | null) => {
-    this.viewConfig.version = Date.now();
+    this.view.version = Date.now();
     if (sort == null) {
-      this.viewConfig.sort = null;
+      this.view.sort = null;
       this.grid.renderViewportRows();
       this.grid.renderViewportCells();
       this.grid.scrollbar.refreshThumb();
       return;
     }
-    this.viewConfig.sort = {
+    this.view.sort = {
       column: 2,
       direction: sort,
     };
     viewWorker.postMessage({
       type: "compute-view",
-      viewConfig: this.viewConfig,
+      viewConfig: this.view,
       recompute: {
         filter: true,
         sort: true,

@@ -3,7 +3,6 @@
   "private": true,
   "version": "0.0.0",
   "scripts": {
-    "dev": "cd example && vite",
     "ts": "tsc --watch --noEmit",
     "predeploy": "echo 'cd example && npm run build'"
   },

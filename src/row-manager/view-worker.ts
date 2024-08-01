@@ -1,4 +1,4 @@
-import { RowData, Rows, ViewConfig } from "./row-manager";
+import { RowData, Rows, View } from "./row-manager";
 import { Row } from "../row";
 import { sort as timSort } from "./timsort";
 import { Result } from "../utils/result";
@@ -72,7 +72,7 @@ let sortCache: Row[] | null = null;
 interface ComputeViewParams {
   rowData: RowData;
   buffer: Int32Array;
-  viewConfig: ViewConfig;
+  viewConfig: View;
   recompute: { sort: boolean; filter: boolean };
   rowsPerViewport: number;
   onEarlyResults: (rows: Row[]) => void;
@@ -172,10 +172,14 @@ export const computeView = async ({
   // console.log(`Uint32Array sort took ${end - start}ms`);
 };
 
+console.log("LOADED WORKER");
 const handleEvent = async (event: Message) => {
+  console.log(this);
+  console.log("EVENT");
   const message = event.data;
   switch (message.type) {
     case "compute-view": {
+      console.log("start");
       currentFilterId[0] = message.viewConfig.version;
       const shouldCancel = () => {
         if (message.viewConfig.version !== currentFilterId[0]) {
@@ -198,6 +202,7 @@ const handleEvent = async (event: Message) => {
           return false;
         },
       });
+      console.log("bef1");
       // NOTE(gab): let other events stream through & check if any of them invalidates this one
       await letOtherEventsThrough();
       if (shouldCancel() || numRows === "cancelled") {
@@ -205,6 +210,7 @@ const handleEvent = async (event: Message) => {
         self.postMessage({ type: "compute-view-cancelled" });
         return;
       }
+      console.log("done1");
       self.postMessage({ type: "compute-view-done", numRows });
       return;
     }
@@ -222,7 +228,7 @@ const handleEvent = async (event: Message) => {
 interface FilterEvent {
   type: "compute-view";
   viewBuffer: Int32Array;
-  viewConfig: ViewConfig;
+  viewConfig: View;
   recompute: {
     filter: boolean;
     sort: boolean;
