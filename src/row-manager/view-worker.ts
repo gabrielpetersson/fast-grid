@@ -1,4 +1,4 @@
-import { RowData, Rows, View } from "./row-manager";
+import { ComputeViewDoneEvent, RowData, Rows, View } from "./row-manager";
 import { Row } from "../row";
 import { sort as timSort } from "./timsort";
 import { Result } from "../utils/result";
@@ -67,41 +67,48 @@ export const filterRows = async ({
   return { ok: true, value: { numRows: offset } };
 };
 
+const getSortComparisonFn = (
+  direction: "ascending" | "descending",
+  col: number
+) => {
+  if (direction === "ascending") {
+    return (a: Row, b: Row) => (a.cells[col].val > b.cells[col].val ? 1 : -1);
+  }
+  return (a: Row, b: Row) => (a.cells[col].val < b.cells[col].val ? 1 : -1);
+};
+
 export const computeView = async ({
   rowData,
   buffer,
   viewConfig,
-  useCachedSort,
+  useSortCache,
   shouldCancel,
 }: {
   rowData: RowData;
   buffer: Int32Array;
   viewConfig: View;
-  useCachedSort: boolean;
+  useSortCache: boolean;
   shouldCancel: () => boolean;
 }): Promise<number | "cancelled"> => {
+  const sortConfig = viewConfig.sort;
+
   let rowsArr = rowData.arr;
-  if (!useCachedSort && viewConfig.sort != null) {
+
+  const shouldRecomputeSort = sortConfig != null && !useSortCache;
+  if (shouldRecomputeSort) {
     const start = performance.now();
     rowsArr = [...rowData.arr]; // todo: can use a global array reference here and manually check if all references are the same still
-    const direction = viewConfig.sort.direction;
-    const col = viewConfig.sort.column;
-    const comp = (() => {
-      if (direction === "ascending") {
-        return (a: Row, b: Row) =>
-          a.cells[col].val > b.cells[col].val ? 1 : -1;
-      }
-      return (a: Row, b: Row) => (a.cells[col].val < b.cells[col].val ? 1 : -1);
-    })();
-    const res = await timSort(rowsArr, comp, shouldCancel);
-    sortCache = rowsArr;
-    console.log("sorting happened, ms", performance.now() - start);
-    if (!res.ok) {
+
+    const fn = getSortComparisonFn(sortConfig.direction, sortConfig.column);
+    const sortResult = await timSort(rowsArr, fn, shouldCancel);
+    if (!sortResult.ok) {
       return "cancelled";
     }
-  } else if (viewConfig.sort == null && sortCache != null) {
-    console.log("using sort cache");
-    rowsArr = sortCache;
+
+    cache.sort = rowsArr;
+    console.log("sorting happened, ms", performance.now() - start);
+  } else if (useSortCache && cache.sort != null) {
+    rowsArr = cache.sort;
   }
 
   await letOtherEventsThrough();
@@ -114,7 +121,6 @@ export const computeView = async ({
   if (filter == null) {
     const start = performance.now();
     for (let i = 0; i < rowsArr.length; i++) {
-      // buffer[i] = rowsArr[i]!.key;
       Atomics.store(buffer, i, rowsArr[i]!.id);
     }
     console.log(
@@ -131,7 +137,11 @@ export const computeView = async ({
     buffer,
     rowsArr,
     onEarlyResults: (numRows: number) => {
-      self.postMessage({ type: "compute-view-done", numRows });
+      self.postMessage({
+        type: "compute-view-done",
+        numRows,
+        skipRefreshThumb: true,
+      } satisfies ComputeViewDoneEvent);
     },
     shouldCancel,
   });
@@ -188,7 +198,9 @@ let rowData: RowData = {
 
 let currentFilterId: [number] = [0];
 
-let sortCache: Row[] | null = null;
+const cache = {
+  sort: null as Row[] | null,
+};
 
 const handleEvent = async (event: Message) => {
   const message = event.data;
@@ -207,7 +219,7 @@ const handleEvent = async (event: Message) => {
       };
       const numRows = await computeView({
         viewConfig: message.viewConfig,
-        useCachedSort: message.useCachedSort ?? false,
+        useSortCache: message.useSortCache ?? false,
         buffer: message.viewBuffer,
         rowData,
         shouldCancel,
@@ -230,7 +242,7 @@ const handleEvent = async (event: Message) => {
         arr: Object.values(message.rows),
         version: Date.now(),
       };
-      sortCache = null;
+      cache.sort = null;
       return;
     }
   }
@@ -240,7 +252,7 @@ export type ComputeViewEvent = {
   type: "compute-view";
   viewBuffer: Int32Array;
   viewConfig: View;
-  useCachedSort?: boolean;
+  useSortCache?: boolean;
 };
 
 export type SetRowsEvent = {
@@ -251,12 +263,5 @@ export type SetRowsEvent = {
 export type Message = MessageEvent<ComputeViewEvent | SetRowsEvent>;
 
 self.addEventListener("message", (event: Message) => {
-  if (event.data.type === "compute-view") {
-    const { viewBuffer, ...rest } = event.data;
-    console.log("got new event", JSON.stringify(rest, null, 4), viewBuffer);
-  } else {
-    console.log("got event", JSON.stringify(event, null, 4));
-  }
-  // NOTE(gab): messsages are handled sync & is blocking, so need to exit the event loop asap
   handleEvent(event);
 });
