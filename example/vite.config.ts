@@ -4,7 +4,7 @@ import react from "@vitejs/plugin-react-swc";
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
-  build: { sourcemap: "inline", target: "esnext", minify: "terser" },
+  build: { sourcemap: "inline", target: "esnext" },
   server: {
     headers: {
       "Cross-Origin-Embedder-Policy": "require-corp",
