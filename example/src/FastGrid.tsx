@@ -21,11 +21,11 @@ export const FastGrid = () => {
   const [sortToggle, setSortToggle] = useState<
     "ascending" | "descending" | null
   >(null);
-  const [isAutoScroll, setIsAutoScroll] = useState<boolean>(false);
+  const [isAutoScroll, setIsAutoScroll] = useState<boolean>(true);
   const [loadingRows, setLoadingRows] = useState<boolean>(false);
   const [isAutoFilter, setIsAutoFilter] = useState<boolean>(false);
   const [filterQuery, setFilterQuery] = useState<string>("");
-  const [rowCount, setRowCount] = useState<number>(40);
+  const [rowCount, setRowCount] = useState<number>(500_000);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -92,12 +92,12 @@ export const FastGrid = () => {
     // grid.renderViewportRows();
   };
 
-  const reverseRows = () => {
-    window.alert("removed due to refactor, implementing soon");
-    if (grid == null) return;
-    // grid.rowManager.reverse();
-    grid.renderViewportRows();
-  };
+  // const reverseRows = () => {
+  //   // window.alert("removed due to refactor, implementing soon");
+  //   if (grid == null) return;
+  //   grid.rowManager.reverse();
+  //   grid.renderViewportRows();
+  // };
 
   const sortSecondColumn = () => {
     if (grid == null) return;
@@ -174,7 +174,7 @@ export const FastGrid = () => {
           isAutoFilter={isAutoFilter}
           isAutoScroll={isAutoScroll}
           addRow={addRow}
-          reverseRows={reverseRows}
+          // reverseRows={reverseRows}
           setFilterQuery={setFilterQuery}
           setIsAutoScroll={setIsAutoScroll}
           setIsAutoFilter={setIsAutoFilter}
@@ -226,7 +226,7 @@ interface PrimaryButtonsProps {
   isAutoFilter: boolean;
   isAutoScroll: boolean;
   addRow: () => void;
-  reverseRows: () => void;
+  // reverseRows: () => void;
   setFilterQuery: (s: string) => void;
   setIsAutoScroll: Dispatch<SetStateAction<boolean>>;
   setIsAutoFilter: Dispatch<SetStateAction<boolean>>;
@@ -237,28 +237,27 @@ const PrimaryButtons: FC<PrimaryButtonsProps> = ({
   sortToggle,
   isAutoFilter,
   isAutoScroll,
-  addRow,
-  reverseRows,
+  // addRow,
+  // reverseRows,
   setFilterQuery,
   setIsAutoScroll,
   setIsAutoFilter,
   sortSecondColumn,
 }) => {
-  console.log(sortToggle);
   return (
     <>
-      <Button
+      {/* <Button
         // disabled={filterQuery !== "" || isAutoFilter}
         onClick={addRow}
       >
         Add row
-      </Button>
-      <Button
+      </Button> */}
+      {/* <Button
         // disabled={filterQuery !== "" || isAutoFilter}
         onClick={reverseRows}
       >
         Reverse rows
-      </Button>
+      </Button> */}
       <Button
         // disabled={filterQuery !== "" || isAutoFilter}
         onClick={sortSecondColumn}
@@ -317,7 +316,7 @@ interface SecondaryButtonsProps {
 }
 const SecondaryButtons: FC<SecondaryButtonsProps> = ({
   rowCount,
-  reset,
+  // reset,
   setRowCount,
 }) => {
   return (
@@ -341,7 +340,7 @@ const SecondaryButtons: FC<SecondaryButtonsProps> = ({
           10 000 000 rows (might run out of ram)
         </option>
       </select>
-      <Button onClick={reset}>Reset</Button>
+      {/* <Button onClick={reset}>Reset</Button> */}
     </>
   );
 };
@@ -390,7 +389,7 @@ const generateRows = async (rowCount: number, grid: Grid, cb: () => void) => {
     }
     const cells: Cell[] = [{ id: -i - 1, text: String(i + 1), val: i }];
     for (let j = 0; j < N_COLS; j++) {
-      const v = Math.round(skewedRandom() * 100000000);
+      const v = Math.round(skewedRandom() * (Math.random() * 1000000));
       cells.push({
         id: cellIndex,
         text: String(v),
@@ -446,9 +445,11 @@ class AutoScroller {
         this.toBottom = true;
       }
 
-      const delta = this.toBottom
-        ? this.grid.viewportHeight
-        : -this.grid.viewportHeight;
+      // const delta = this.toBottom
+      //   ? this.grid.viewportHeight
+      //   : -this.grid.viewportHeight;
+
+      const delta = this.toBottom ? 2 : -2;
 
       const wheelEvent = new WheelEvent("wheel", {
         deltaY: delta,

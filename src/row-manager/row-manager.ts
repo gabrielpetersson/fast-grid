@@ -45,6 +45,8 @@ export class RowManager {
   numCols: number;
   grid: Grid;
   view: View;
+
+  isViewResult: boolean = false;
   currentFilterId: number;
   viewBuffer: RowBuffer;
   noViewBuffer: RowBuffer;
@@ -67,38 +69,51 @@ export class RowManager {
     );
     this.viewBuffer = { buffer: new Int32Array(sharedBuffer), numRows: -1 };
 
-    const noFilterBuffer = new Int32Array(
+    // idk what im doing here, unifying the interface so if i have no view i also use a shared array buffer which is just a [0, 1, 2, 3, ...] index??
+    const noViewBuffer = new Int32Array(
       1_000_000 * Int32Array.BYTES_PER_ELEMENT
     );
     for (const id in rows) {
-      noFilterBuffer[id] = Number(id);
+      noViewBuffer[id] = Number(id);
     }
     this.noViewBuffer = {
-      buffer: noFilterBuffer,
+      buffer: noViewBuffer,
       numRows: Object.values(rows).length,
     };
 
-    viewWorker.onmessage = (event) => {
+    viewWorker.onmessage = (event: MessageEvent<ComputeViewDoneEvent>) => {
       switch (event.data.type) {
         case "compute-view-done": {
-          console.log("compute view done", event.data.numRows);
           this.viewBuffer.numRows = event.data.numRows;
+          this.isViewResult = true;
           this.grid.renderViewportRows();
-          this.grid.scrollbar.clampThumbIfNeeded();
+
+          if (event.data.skipRefreshThumb === true) {
+            this.grid.scrollbar.clampThumbIfNeeded();
+          }
+
           this.grid.renderViewportRows();
           this.grid.renderViewportCells();
+          if (event.data.skipRefreshThumb === true) {
+            this.grid.scrollbar.refreshThumb();
+          }
           // NOTE(gab): refresh size of thumb after completely done filtering, to prevent jumping of size
-          this.grid.scrollbar.refreshThumb();
           break;
         }
       }
     };
   }
-  isView = () => {
-    return this.view.filter.length !== 0 || this.view.sort != null;
+  // isViewResult = () => {
+  //   return this.view.filter.length !== 0 || this.view.sort != null;
+  // };
+  reverse = () => {
+    for (let i = this.rowData.arr.length - 1; i >= 0; i--) {
+      this.noViewBuffer.buffer[i] =
+        this.rowData.arr[this.rowData.arr.length - 1 - i].id;
+    }
   };
   getViewBuffer = (): RowBuffer => {
-    if (this.isView()) {
+    if (this.isViewResult) {
       return this.viewBuffer;
     }
     return this.noViewBuffer;
@@ -186,6 +201,10 @@ export class RowManager {
   //   console.log(`Filtering took ${ms}. Avg: ${avgFilterMs}`);
   // };
 
+  isViewEmpty = () => {
+    return this.view.filter.length === 0 && this.view.sort == null;
+  };
+
   updateFilterOrCreateNew = (query: string) => {
     const filter = this.view.filter.find((f) => f.column === FILTER_COL);
     if (filter != null) {
@@ -210,41 +229,65 @@ export class RowManager {
       this.view.filter.splice(filterIndex, 1);
       // ----------------
 
+      if (this.isViewEmpty()) {
+        this.isViewResult = false;
+      }
+
       this.grid.renderViewportRows();
       this.grid.renderViewportCells();
       this.grid.scrollbar.refreshThumb();
-      return;
+    } else {
+      this.updateFilterOrCreateNew(query);
     }
 
-    this.updateFilterOrCreateNew(query);
-
-    viewWorker.postMessage({
-      type: "compute-view",
-      viewConfig: this.view,
-      viewBuffer: this.viewBuffer.buffer,
-      useCachedSort: true,
-    } satisfies ComputeViewEvent);
+    if (!this.isViewEmpty()) {
+      viewWorker.postMessage({
+        type: "compute-view",
+        viewConfig: this.view,
+        viewBuffer: this.viewBuffer.buffer,
+        useSortCache: true,
+      } satisfies ComputeViewEvent);
+    }
   };
   multithreadSortBy = async (sort: "ascending" | "descending" | null) => {
+    console.count("---------- start sort");
     this.view.version = Date.now();
     if (sort == null) {
       this.view.sort = null;
+      console.log(
+        "sort null",
+        this.isViewEmpty(),
+        this.view.filter,
+        this.view.sort
+      );
+      if (this.isViewEmpty()) {
+        this.isViewResult = false;
+      }
+
       this.grid.renderViewportRows();
       this.grid.renderViewportCells();
       this.grid.scrollbar.refreshThumb();
-      return;
+    } else {
+      this.view.sort = {
+        column: SORT_COL,
+        direction: sort,
+      };
     }
-    this.view.sort = {
-      column: SORT_COL,
-      direction: sort,
-    };
-    viewWorker.postMessage({
-      type: "compute-view",
-      viewConfig: this.view,
-      viewBuffer: this.viewBuffer.buffer,
-    } satisfies ComputeViewEvent);
+    if (!this.isViewEmpty()) {
+      viewWorker.postMessage({
+        type: "compute-view",
+        viewConfig: this.view,
+        viewBuffer: this.viewBuffer.buffer,
+      } satisfies ComputeViewEvent);
+    }
   };
 }
+
+export type ComputeViewDoneEvent = {
+  type: "compute-view-done";
+  numRows: number;
+  skipRefreshThumb?: boolean;
+};
 
 // temporary while i dont have multi column views. these are  columnindexes to be computed for sort/filter
 export const FILTER_COL = 1;

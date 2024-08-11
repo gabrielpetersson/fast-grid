@@ -72,7 +72,7 @@ export class Grid {
     const numRows = this.rowManager.getNumRows();
 
     const cellsPerRow = Math.floor(this.viewportWidth / CELL_WIDTH) + 2;
-    const tableWidth = this.rowManager.numCols * CELL_WIDTH ?? 0;
+    const tableWidth = this.rowManager.numCols * CELL_WIDTH;
 
     // full viewport, and an additional row top and bottom to simulate scrolling
     const rowsPerViewport = Math.floor(this.viewportHeight / ROW_HEIGHT) + 2;
