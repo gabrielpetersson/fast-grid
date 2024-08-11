@@ -1,7 +1,7 @@
 import { Grid } from "../grid";
 import { Row } from "../row";
 import { ComputeViewEvent, SetRowsEvent } from "./view-worker";
-import ViewWorker from "./view-worker?worker";
+import ViewWorker from "./view-worker?worker&inline";
 
 const viewWorker = new ViewWorker();
 

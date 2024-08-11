@@ -5,9 +5,9 @@ import { Result } from "../utils/result";
 import { wait } from "../utils/wait";
 console.log("Worker initialized");
 
-export const letOtherEventsThrough = () => wait(0);
+const letOtherEventsThrough = () => wait(0);
 
-export const filterRows = async ({
+const filterRows = async ({
   query,
   column,
   rowsArr,
@@ -77,7 +77,7 @@ const getSortComparisonFn = (
   return (a: Row, b: Row) => (a.cells[col].val < b.cells[col].val ? 1 : -1);
 };
 
-export const computeView = async ({
+const computeView = async ({
   rowData,
   buffer,
   viewConfig,

@@ -67,6 +67,12 @@ export class Grid {
     const observer = new ResizeObserver(this.onResize);
     observer.observe(container);
     this.renderViewportRows();
+
+    if (typeof SharedArrayBuffer === "undefined") {
+      window.alert(
+        "SharedArrayBuffer is not available. Grid might not work properly."
+      );
+    }
   }
   getState = (): GridState => {
     const numRows = this.rowManager.getNumRows();
