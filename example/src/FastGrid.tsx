@@ -21,7 +21,9 @@ export const FastGrid = () => {
   const [sortToggle, setSortToggle] = useState<
     "ascending" | "descending" | null
   >(null);
-  const [isAutoScroll, setIsAutoScroll] = useState<boolean>(true);
+  const [isAutoScroll, setIsAutoScroll] = useState<boolean>(
+    window.innerWidth > 1000
+  );
   const [loadingRows, setLoadingRows] = useState<boolean>(false);
   const [isAutoFilter, setIsAutoFilter] = useState<boolean>(false);
   const [filterQuery, setFilterQuery] = useState<string>("");
@@ -210,7 +212,7 @@ const Button: FC<ButtonProps> = ({ disabled, children, onClick }) => {
     <div
       onClick={onClick}
       className={clsx(
-        "flex h-full w-[150px] cursor-pointer select-none items-center justify-center rounded border border-gray-600 bg-blue-500 hover:opacity-95 active:opacity-90",
+        "flex h-full w-[146px] cursor-pointer select-none items-center justify-center rounded border border-gray-600 bg-blue-500 hover:opacity-95 active:opacity-90",
         box,
         disabled && "pointer-events-none opacity-70"
       )}
@@ -264,14 +266,27 @@ const PrimaryButtons: FC<PrimaryButtonsProps> = ({
       >
         Sort second column
         {sortToggle != null && (
-          <span className="material-symbols-outlined text-[13px]">
-            {sortToggle === "ascending" ? "arrow_upward" : "arrow_downward"}
-          </span>
+          <>
+            <div
+              className={`material-symbols-outlined ml-[2px] text-[13px] ${
+                sortToggle === "ascending" ? "" : "hidden"
+              }`}
+            >
+              arrow_upward
+            </div>
+            <div
+              className={`material-symbols-outlined ml-[2px] text-[13px] ${
+                sortToggle === "descending" ? "" : "hidden"
+              }`}
+            >
+              arrow_downward
+            </div>
+          </>
         )}
       </Button>
       <div
         className={clsx(
-          "flex h-full w-[150px] overflow-hidden rounded border border-gray-800 bg-white text-[11px] text-gray-800 lg:text-[13px]",
+          "flex h-full w-[150px] overflow-hidden rounded border border-gray-800 bg-white text-gray-800",
           box
         )}
       >
@@ -279,7 +294,7 @@ const PrimaryButtons: FC<PrimaryButtonsProps> = ({
           value={filterQuery}
           placeholder="Filter second column..."
           onChange={(e) => setFilterQuery(e.target.value)}
-          className={"flex-1 pl-2 outline-none"}
+          className="flex-1 pl-[3px] text-[11px] outline-none lg:pl-2"
         />
       </div>
       <Checkbox
