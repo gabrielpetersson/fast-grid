@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "scripts": {
     "ts": "tsc --watch --noEmit",
-    "predeploy": "echo 'cd example && npm run build'"
+    "predeploy": "cd example && npm run build"
   },
   "devDependencies": {
     "typescript": "5.0.2",
