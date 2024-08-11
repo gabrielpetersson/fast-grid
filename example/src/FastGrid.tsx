@@ -12,6 +12,7 @@ import Stats from "stats.js";
 import clsx from "clsx";
 import { isTimeToYield, yieldControl } from "main-thread-scheduling";
 import { Rows } from "../../src/row-manager/row-manager";
+import { Analytics } from "@vercel/analytics/react";
 
 const N_COLS = 15;
 
@@ -127,6 +128,7 @@ export const FastGrid = () => {
 
   return (
     <>
+      <Analytics />
       <h1 className="self-start text-xl font-bold lg:self-center lg:text-3xl">
         {"World's most performant DOM-based table"}
       </h1>
