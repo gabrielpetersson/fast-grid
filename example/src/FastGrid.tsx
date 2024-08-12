@@ -28,7 +28,7 @@ export const FastGrid = () => {
   const [loadingRows, setLoadingRows] = useState<boolean>(false);
   const [isAutoFilter, setIsAutoFilter] = useState<boolean>(false);
   const [filterQuery, setFilterQuery] = useState<string>("");
-  const [rowCount, setRowCount] = useState<number>(500_000);
+  const [rowCount, setRowCount] = useState<number>(100_000);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
