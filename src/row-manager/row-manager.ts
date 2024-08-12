@@ -84,17 +84,18 @@ export class RowManager {
     viewWorker.onmessage = (event: MessageEvent<ComputeViewDoneEvent>) => {
       switch (event.data.type) {
         case "compute-view-done": {
+          const updateThumb = event.data.skipRefreshThumb !== true;
           this.viewBuffer.numRows = event.data.numRows;
           this.isViewResult = true;
           this.grid.renderViewportRows();
 
-          if (event.data.skipRefreshThumb === true) {
+          if (updateThumb) {
             this.grid.scrollbar.clampThumbIfNeeded();
           }
 
           this.grid.renderViewportRows();
           this.grid.renderViewportCells();
-          if (event.data.skipRefreshThumb === true) {
+          if (updateThumb) {
             this.grid.scrollbar.refreshThumb();
           }
           // NOTE(gab): refresh size of thumb after completely done filtering, to prevent jumping of size
