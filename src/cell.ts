@@ -47,7 +47,7 @@ export class CellComponent {
   el: HTMLDivElement;
   _offset: number;
   cellRef: Cell;
-  constructor(offset: number, cellRef: Cell) {
+  constructor(offset: number, cellRef: Cell, isHeader?: boolean) {
     this._offset = offset;
     this.cellRef = cellRef;
 
@@ -59,6 +59,11 @@ export class CellComponent {
     this.el.className =
       "flex h-full pt-[5px] border-[0] border-r border-b border-solid border-gray-700 text-gray-800 box-border cursor-default pl-[6px] absolute left-0 overflow-clip";
     this.el.style.width = `${CELL_WIDTH}px`;
+
+    if (isHeader) {
+      this.el.style.backgroundColor = "white";
+      this.el.style.fontWeight = "500";
+    }
 
     this.setOffset(this._offset, true);
     this.setValue(cellRef);

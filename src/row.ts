@@ -11,18 +11,29 @@ export class RowComponent {
   el: HTMLDivElement;
   cells: Cell[];
   _offset: number;
+  isHeader: boolean;
 
   cellComponentMap: Record<string, CellComponent>;
   grid: Grid;
-  constructor(grid: Grid, id: number, cells: Cell[], _offset: number) {
+  constructor(
+    grid: Grid,
+    id: number,
+    cells: Cell[],
+    _offset: number,
+    isHeader?: boolean
+  ) {
     this.grid = grid;
     this.id = id;
     this.cells = cells;
     this._offset = _offset;
     this.cellComponentMap = {};
+    this.isHeader = isHeader ?? false;
 
     this.el = document.createElement("div");
     this.el.className = "absolute top-0 h-[32px]";
+    if (isHeader) {
+      this.el.style.zIndex = "10000";
+    }
 
     this.setOffset(_offset, true);
     this.renderCells();
@@ -80,7 +91,7 @@ export class RowComponent {
         continue;
       }
 
-      const newCell = new CellComponent(offset, cell);
+      const newCell = new CellComponent(offset, cell, this.isHeader);
       this.el.appendChild(newCell.el);
       this.cellComponentMap[newCell.cellRef.id] = newCell;
     }

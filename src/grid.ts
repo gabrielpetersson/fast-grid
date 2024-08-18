@@ -29,8 +29,13 @@ interface GridState {
   cellsPerRow: number;
 }
 
+const HEADER_HEIGHT = 32;
+const HEADER_ID = 99999999999999; // very dumb
+
 export class Grid {
   state: GridState;
+
+  header?: RowComponent;
 
   offsetY: number;
   offsetX: number;
@@ -46,12 +51,17 @@ export class Grid {
 
   viewportWidth: number;
   viewportHeight: number;
-  constructor(container: HTMLDivElement, rows: Rows) {
+  constructor(container: HTMLDivElement, rows: Rows, header?: string[]) {
     this.container = container;
     this.rowManager = new RowManager(this, rows);
 
     this.viewportWidth = this.container.clientWidth;
-    this.viewportHeight = this.container.clientHeight;
+    if (this.header != null) {
+      this.viewportHeight = this.container.clientHeight - HEADER_HEIGHT;
+    } else {
+      this.viewportHeight = this.container.clientHeight;
+    }
+
     this.state = this.getState();
 
     this.offsetY = 0;
@@ -68,6 +78,21 @@ export class Grid {
     observer.observe(container);
     this.renderViewportRows();
 
+    if (header != null) {
+      this.header = new RowComponent(
+        this,
+        HEADER_ID,
+        header.map((s, i) => ({
+          id: i,
+          text: s,
+          val: 0,
+        })),
+        0,
+        true
+      );
+      this.container.appendChild(this.header.el);
+    }
+
     if (typeof SharedArrayBuffer === "undefined") {
       window.alert(
         "SharedArrayBuffer is not available. Grid might not work properly."
@@ -77,11 +102,11 @@ export class Grid {
   getState = (): GridState => {
     const numRows = this.rowManager.getNumRows();
 
-    const cellsPerRow = Math.floor(this.viewportWidth / CELL_WIDTH) + 2;
+    const cellsPerRow = Math.ceil(this.viewportWidth / CELL_WIDTH) + 1;
     const tableWidth = this.rowManager.numCols * CELL_WIDTH;
 
     // full viewport, and an additional row top and bottom to simulate scrolling
-    const rowsPerViewport = Math.floor(this.viewportHeight / ROW_HEIGHT) + 2;
+    const rowsPerViewport = Math.ceil(this.viewportHeight / ROW_HEIGHT);
 
     const tableHeight = numRows * ROW_HEIGHT;
 
@@ -132,11 +157,13 @@ export class Grid {
       (this.offsetX / scrollableWidth) * this.viewportWidth -
       thumbSizeX * (this.offsetX / scrollableWidth);
 
-    // dumb but anyway it minimizes GC by not allocating a shit ton of pointers since these are all scalars
+    // dumb but anyway it minimizes GC by not allocating a shit ton of pointers since these are all scalars.
+    // might be a bit slower but we are already way below 16ms per frame
     if (this.state != null) {
       this.state.endRow = endRow;
       this.state.startRow = startRow;
-      this.state.rowOffset = rowOffset;
+      this.state.rowOffset =
+        this.header != null ? rowOffset + HEADER_HEIGHT : rowOffset;
 
       this.state.startCell = startCell;
       this.state.endCell = endCell;
@@ -181,6 +208,10 @@ export class Grid {
   };
 
   renderViewportRows = () => {
+    if (this.header != null) {
+      this.header.renderCells();
+      this.header.setOffset(0);
+    }
     // reusing DOM and updating only the least possible content. 3 steps:
     // 1) see which rows goes out of viewport
     // 2) see which rows comes into viewport. reuse rows if possible, otherwise create new DOM elements
@@ -256,6 +287,9 @@ export class Grid {
         continue;
       }
       rowComponent.renderCells();
+    }
+    if (this.header != null) {
+      this.header.renderCells();
     }
   };
   onResize = () => {
