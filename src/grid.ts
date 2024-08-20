@@ -1,4 +1,4 @@
-import { CELL_WIDTH } from "./cell";
+import { CELL_WIDTH, HeaderCell, FilterCell, StringCell } from "./cell";
 import { RowComponent } from "./row";
 import { RowManager, Rows } from "./row-manager/row-manager";
 import { Scrollbar } from "./scrollbar";
@@ -29,13 +29,12 @@ interface GridState {
   cellsPerRow: number;
 }
 
-const HEADER_HEIGHT = 32;
 const HEADER_ID = 99999999999999; // very dumb
 
 export class Grid {
   state: GridState;
 
-  header?: RowComponent;
+  headerRows: RowComponent[];
 
   offsetY: number;
   offsetX: number;
@@ -51,16 +50,19 @@ export class Grid {
 
   viewportWidth: number;
   viewportHeight: number;
-  constructor(container: HTMLDivElement, rows: Rows, header?: string[]) {
+  numCols: number;
+
+  resizeObserver: ResizeObserver;
+  constructor(container: HTMLDivElement, rows: Rows, headers: string[]) {
     this.container = container;
     this.rowManager = new RowManager(this, rows);
 
+    this.headerRows = this.createHeader(headers);
+    this.numCols = headers.length; // set once atm so might cause bugs
+
     this.viewportWidth = this.container.clientWidth;
-    if (this.header != null) {
-      this.viewportHeight = this.container.clientHeight - HEADER_HEIGHT;
-    } else {
-      this.viewportHeight = this.container.clientHeight;
-    }
+    this.viewportHeight =
+      this.container.clientHeight - ROW_HEIGHT * this.headerRows.length;
 
     this.state = this.getState();
 
@@ -74,23 +76,12 @@ export class Grid {
     this.scrollbar = new Scrollbar(this);
     new PhoneControls(this.container);
 
-    const observer = new ResizeObserver(this.onResize);
-    observer.observe(container);
-    this.renderViewportRows();
+    this.resizeObserver = new ResizeObserver(this.onResize);
+    this.resizeObserver.observe(container);
 
-    if (header != null) {
-      this.header = new RowComponent(
-        this,
-        HEADER_ID,
-        header.map((s, i) => ({
-          id: i,
-          text: s,
-          val: 0,
-        })),
-        0,
-        true
-      );
-      this.container.appendChild(this.header.el);
+    this.renderViewportRows();
+    for (const row of this.headerRows) {
+      row.renderCells();
     }
 
     if (typeof SharedArrayBuffer === "undefined") {
@@ -99,11 +90,40 @@ export class Grid {
       );
     }
   }
+  createHeader(headers: string[]) {
+    let offset = 0;
+    const toolsRow = new RowComponent(
+      this,
+      HEADER_ID,
+      headers.map((_, i) => ({
+        id: i,
+        text: "",
+        val: 0,
+      })),
+      offset,
+      FilterCell
+    );
+    const headerRow = new RowComponent(
+      this,
+      HEADER_ID,
+      headers.map((header, i) => ({
+        id: i,
+        text: header,
+        val: 0,
+      })),
+      (offset += ROW_HEIGHT),
+      HeaderCell
+    );
+
+    this.container.appendChild(toolsRow.el);
+    this.container.appendChild(headerRow.el);
+    return [toolsRow, headerRow];
+  }
   getState = (): GridState => {
     const numRows = this.rowManager.getNumRows();
 
     const cellsPerRow = Math.ceil(this.viewportWidth / CELL_WIDTH) + 1;
-    const tableWidth = this.rowManager.numCols * CELL_WIDTH;
+    const tableWidth = this.numCols * CELL_WIDTH;
 
     // full viewport, and an additional row top and bottom to simulate scrolling
     const rowsPerViewport = Math.ceil(this.viewportHeight / ROW_HEIGHT);
@@ -111,7 +131,7 @@ export class Grid {
     const tableHeight = numRows * ROW_HEIGHT;
 
     const startCell = Math.floor(this.offsetX / CELL_WIDTH);
-    const endCell = Math.min(startCell + cellsPerRow, this.rowManager.numCols);
+    const endCell = Math.min(startCell + cellsPerRow, this.numCols);
     const cellOffset = -Math.floor(this.offsetX % CELL_WIDTH);
 
     // start to end of rows to render, along with the row offset to simulate scrolling
@@ -162,8 +182,7 @@ export class Grid {
     if (this.state != null) {
       this.state.endRow = endRow;
       this.state.startRow = startRow;
-      this.state.rowOffset =
-        this.header != null ? rowOffset + HEADER_HEIGHT : rowOffset;
+      this.state.rowOffset = rowOffset + ROW_HEIGHT * this.headerRows.length;
 
       this.state.startCell = startCell;
       this.state.endCell = endCell;
@@ -208,10 +227,6 @@ export class Grid {
   };
 
   renderViewportRows = () => {
-    if (this.header != null) {
-      this.header.renderCells();
-      this.header.setOffset(0);
-    }
     // reusing DOM and updating only the least possible content. 3 steps:
     // 1) see which rows goes out of viewport
     // 2) see which rows comes into viewport. reuse rows if possible, otherwise create new DOM elements
@@ -266,7 +281,13 @@ export class Grid {
         continue;
       }
 
-      const rowComponent = new RowComponent(this, row.id, row.cells, offset);
+      const rowComponent = new RowComponent(
+        this,
+        row.id,
+        row.cells,
+        offset,
+        StringCell
+      );
       this.container.appendChild(rowComponent.el);
       this.rowComponentMap[row.id] = rowComponent;
     }
@@ -288,8 +309,9 @@ export class Grid {
       }
       rowComponent.renderCells();
     }
-    if (this.header != null) {
-      this.header.renderCells();
+
+    for (const row of this.headerRows) {
+      row.renderCells();
     }
   };
   onResize = () => {
@@ -305,5 +327,6 @@ export class Grid {
     for (const id in this.rowComponentMap) {
       this.rowComponentMap[id].destroy();
     }
+    this.resizeObserver.disconnect();
   };
 }

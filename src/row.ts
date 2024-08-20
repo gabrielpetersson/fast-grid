@@ -1,17 +1,32 @@
-import { CELL_WIDTH, Cell, CellComponent } from "./cell";
+import {
+  CELL_WIDTH,
+  CellComponent,
+  HeaderCell,
+  FilterCell,
+  StringCell,
+} from "./cell";
 import { Grid } from "./grid";
+
+export type Cell = {
+  id: number;
+  text: string;
+  val: number;
+};
 
 export interface Row {
   id: number;
   cells: Cell[];
 }
 
+type CellRenderer = typeof StringCell | typeof HeaderCell | typeof FilterCell;
+
 export class RowComponent {
   id: number;
   el: HTMLDivElement;
   cells: Cell[];
+
   _offset: number;
-  isHeader: boolean;
+  CellRenderer: CellRenderer;
 
   cellComponentMap: Record<string, CellComponent>;
   grid: Grid;
@@ -19,23 +34,26 @@ export class RowComponent {
     grid: Grid,
     id: number,
     cells: Cell[],
-    _offset: number,
-    isHeader?: boolean
+    offset: number,
+    CellRenderer: CellRenderer
   ) {
     this.grid = grid;
     this.id = id;
     this.cells = cells;
-    this._offset = _offset;
+    this._offset = offset;
     this.cellComponentMap = {};
-    this.isHeader = isHeader ?? false;
 
     this.el = document.createElement("div");
     this.el.className = "absolute top-0 h-[32px]";
-    if (isHeader) {
-      this.el.style.zIndex = "10000";
+
+    // eh temporary header hack, make this passable
+    if (CellRenderer !== StringCell) {
+      this.el.style.zIndex = "1";
     }
 
-    this.setOffset(_offset, true);
+    this.CellRenderer = CellRenderer;
+
+    this.setOffset(this._offset, true);
     this.renderCells();
   }
   destroy() {
@@ -84,20 +102,25 @@ export class RowComponent {
 
       const reuseCell = removeCells.pop();
       if (reuseCell != null) {
-        delete this.cellComponentMap[reuseCell.cellRef.id];
-        reuseCell.setValue(cell);
-        reuseCell.setOffset(offset);
-        this.cellComponentMap[reuseCell.cellRef.id] = reuseCell;
+        delete this.cellComponentMap[reuseCell.id];
+        reuseCell.reuse(cell.id, offset, cell.text, i);
+        this.cellComponentMap[reuseCell.id] = reuseCell;
         continue;
       }
 
-      const newCell = new CellComponent(offset, cell, this.isHeader);
+      const newCell = new this.CellRenderer(
+        cell.id,
+        offset,
+        cell.text,
+        this.grid,
+        i
+      );
       this.el.appendChild(newCell.el);
-      this.cellComponentMap[newCell.cellRef.id] = newCell;
+      this.cellComponentMap[newCell.id] = newCell;
     }
 
     for (const cell of removeCells) {
-      delete this.cellComponentMap[cell.cellRef.id];
+      delete this.cellComponentMap[cell.id];
       this.el.removeChild(cell.el);
     }
   }

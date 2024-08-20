@@ -952,18 +952,6 @@ export async function sort<T>(
     throw new TypeError("Can only sort arrays");
   }
 
-  /*
-   * Handle the case where a comparison function is not provided. We do
-   * lexicographic sorting
-   */
-  if (!compare) {
-    compare = alphabeticalCompare;
-  } else if (typeof compare !== "function") {
-    hi = lo;
-    lo = compare;
-    compare = alphabeticalCompare;
-  }
-
   if (!lo) {
     lo = 0;
   }

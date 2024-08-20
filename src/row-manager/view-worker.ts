@@ -3,41 +3,38 @@ import { Row } from "../row";
 import { sort as timSort } from "./timsort";
 import { Result } from "../utils/result";
 import { wait } from "../utils/wait";
+import { isEmptyFast } from "../utils/is-empty-fast";
 console.log("Worker initialized");
 
 const letOtherEventsThrough = () => wait(0);
 
 const filterRows = async ({
-  query,
-  column,
+  filter,
   rowsArr,
   buffer,
   shouldCancel,
   onEarlyResults,
 }: {
-  query: string;
-  column: number;
+  filter: View["filter"];
   rowsArr: Row[];
   buffer: Int32Array;
   shouldCancel: () => boolean;
   onEarlyResults: (numRows: number) => void;
 }): Promise<Result<{ numRows: number }>> => {
-  // minimum ms until we return early results. scrolling is clamped so if we return like only viewport we'd always
-  // go back to the top again while filtering from the middle
-  const MIN_MS_EARLY_RESULT = 30;
-  const MIN_RESULTS_EARLY_RESULT = 32;
+  const lowerCaseFilter: Record<number, string> = Object.fromEntries(
+    Object.entries(filter).map(([k, v]) => [k, v.toLowerCase()])
+  );
+
+  const MIN_RESULTS_EARLY_RESULT = 50;
   const ROW_CHUNK_SIZE = 30000;
 
   const numChunks = Math.ceil(rowsArr.length / ROW_CHUNK_SIZE);
-  const start = performance.now();
   let sentEarlyResults = false;
   let offset = 0;
 
   for (let chunkIndex = 0; chunkIndex < numChunks; chunkIndex++) {
     const startIndex = chunkIndex * ROW_CHUNK_SIZE;
     const endIndex = Math.min(startIndex + ROW_CHUNK_SIZE, rowsArr.length);
-
-    const timeSinceStart = performance.now() - start;
 
     await letOtherEventsThrough();
     if (shouldCancel()) {
@@ -46,8 +43,9 @@ const filterRows = async ({
 
     if (
       !sentEarlyResults &&
-      timeSinceStart > MIN_MS_EARLY_RESULT &&
-      offset > MIN_RESULTS_EARLY_RESULT
+      offset > MIN_RESULTS_EARLY_RESULT &&
+      rowsArr.length > 70000 &&
+      startIndex > 30000
     ) {
       // makes filtering look super fast
       onEarlyResults(offset);
@@ -56,9 +54,17 @@ const filterRows = async ({
 
     for (let i = startIndex; i < endIndex; i++) {
       const row = rowsArr[i]!;
-      // NOTE(gab): indexOf is faster than includes
-      if (row.cells[column]!.text.indexOf(query) > -1) {
-        // buffer[offset] = row.id;
+      let matchesFilter = true;
+
+      for (const column in lowerCaseFilter) {
+        const query = lowerCaseFilter[column];
+        if (row.cells[column].text.toLowerCase().indexOf(query) === -1) {
+          matchesFilter = false;
+          break;
+        }
+      }
+
+      if (matchesFilter) {
         Atomics.store(buffer, offset, row.id);
         offset += 1;
       }
@@ -68,13 +74,30 @@ const filterRows = async ({
 };
 
 const getSortComparisonFn = (
-  direction: "ascending" | "descending",
-  col: number
+  config: ["ascending" | "descending" | null, number][]
 ) => {
-  if (direction === "ascending") {
-    return (a: Row, b: Row) => (a.cells[col].val > b.cells[col].val ? 1 : -1);
-  }
-  return (a: Row, b: Row) => (a.cells[col].val < b.cells[col].val ? 1 : -1);
+  return (a: Row, b: Row) => {
+    for (let col = 0; col < config.length; col++) {
+      const [direction, colIndex] = config[col];
+      // const colIndex = config[col].column;
+      if (direction === null) {
+        continue;
+      }
+      if (direction === "ascending") {
+        if (a.cells[colIndex].text > b.cells[colIndex].text) {
+          return 1;
+        } else if (a.cells[colIndex].text < b.cells[colIndex].text) {
+          return -1;
+        }
+      }
+      if (a.cells[colIndex].text < b.cells[colIndex].text) {
+        return 1;
+      } else if (a.cells[colIndex].text > b.cells[colIndex].text) {
+        return -1;
+      }
+    }
+    return 0;
+  };
 };
 
 const computeView = async ({
@@ -94,21 +117,23 @@ const computeView = async ({
 
   let rowsArr = rowData.arr;
 
-  const shouldRecomputeSort = sortConfig != null && !useSortCache;
-  if (shouldRecomputeSort) {
-    const start = performance.now();
+  if (useSortCache) {
+    rowsArr = cache.sort ?? rowData.arr;
+  } else if (!isEmptyFast(sortConfig)) {
     rowsArr = [...rowData.arr]; // todo: can use a global array reference here and manually check if all references are the same still
 
-    const fn = getSortComparisonFn(sortConfig.direction, sortConfig.column);
-    const sortResult = await timSort(rowsArr, fn, shouldCancel);
+    const start = performance.now();
+    const sortResult = await timSort(
+      rowsArr,
+      getSortComparisonFn(sortConfig.map((c) => [c.direction, c.column])),
+      shouldCancel
+    );
     if (!sortResult.ok) {
       return "cancelled";
     }
+    console.log("sorting took", performance.now() - start);
 
     cache.sort = rowsArr;
-    console.log("sorting happened, ms", performance.now() - start);
-  } else if (useSortCache && cache.sort != null) {
-    rowsArr = cache.sort;
   }
 
   await letOtherEventsThrough();
@@ -116,9 +141,7 @@ const computeView = async ({
     return "cancelled";
   }
 
-  // TODO(gab): remove hardcode for column 2
-  const filter = viewConfig.filter[0]; //.find((f) => f.column === 1);
-  if (filter == null) {
+  if (isEmptyFast(viewConfig.filter)) {
     const start = performance.now();
     for (let i = 0; i < rowsArr.length; i++) {
       Atomics.store(buffer, i, rowsArr[i]!.id);
@@ -132,11 +155,11 @@ const computeView = async ({
 
   const start = performance.now();
   const result = await filterRows({
-    query: filter.query,
-    column: filter.column,
+    filter: viewConfig.filter,
     buffer,
     rowsArr,
     onEarlyResults: (numRows: number) => {
+      console.log("early results", numRows);
       self.postMessage({
         type: "compute-view-done",
         numRows,
@@ -209,8 +232,8 @@ const handleEvent = async (event: Message) => {
       currentFilterId[0] = message.viewConfig.version;
       const shouldCancel = () => {
         if (message.viewConfig.version !== currentFilterId[0]) {
-          console.error(
-            "cancelled",
+          console.log(
+            "cancelled computation of view",
             message.viewConfig.version,
             currentFilterId[0]
           );

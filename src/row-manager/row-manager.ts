@@ -1,5 +1,6 @@
 import { Grid } from "../grid";
 import { Row } from "../row";
+import { isEmptyFast } from "../utils/is-empty-fast";
 import { ComputeViewEvent, SetRowsEvent } from "./view-worker";
 import ViewWorker from "./view-worker?worker&inline";
 
@@ -11,21 +12,10 @@ export type Rows = { [id: number]: Row };
 
 // const filterStartTimes: Record<string, number> = {};
 
-export interface Filter {
-  type: "string";
-  column: number;
-  query: string;
-}
-
-export interface Sort {
-  column: number;
-  direction: "ascending" | "descending";
-}
-
+type ColumnIndex = number;
 export interface View {
-  filter: Filter[];
-  // TODO(gab): multi column sort
-  sort: Sort | null;
+  filter: Record<ColumnIndex, string>;
+  sort: { direction: "ascending" | "descending"; column: ColumnIndex }[]; // is applied in order
   version: number;
 }
 
@@ -35,6 +25,7 @@ export interface RowBuffer {
 }
 
 export interface RowData {
+  // duplicate the data so we can access it quickly, both arr & map
   obj: Rows;
   arr: Row[];
   version: number;
@@ -42,7 +33,6 @@ export interface RowData {
 
 export class RowManager {
   rowData: RowData;
-  numCols: number;
   grid: Grid;
   view: View;
 
@@ -53,12 +43,11 @@ export class RowManager {
   constructor(grid: Grid, rows: Rows) {
     this.grid = grid;
     this.rowData = { obj: rows, arr: Object.values(rows), version: Date.now() };
-    this.numCols = rows[0]?.cells.length ?? 0;
 
     this.currentFilterId = 0;
     this.view = {
-      filter: [],
-      sort: null,
+      filter: {},
+      sort: [],
       version: Date.now(),
     };
 
@@ -69,7 +58,7 @@ export class RowManager {
     );
     this.viewBuffer = { buffer: new Int32Array(sharedBuffer), numRows: -1 };
 
-    // idk what im doing here, unifying the interface so if i have no view i also use a shared array buffer which is just a [0, 1, 2, 3, ...] index??
+    // EHHH this is very dumb, just unifying my array buffer interface between views and not views.. which should just be an iterable index
     const noViewBuffer = new Int32Array(
       1_000_000 * Int32Array.BYTES_PER_ELEMENT
     );
@@ -104,9 +93,6 @@ export class RowManager {
       }
     };
   }
-  // isViewResult = () => {
-  //   return this.view.filter.length !== 0 || this.view.sort != null;
-  // };
   reverse = () => {
     for (let i = this.rowData.arr.length - 1; i >= 0; i--) {
       this.noViewBuffer.buffer[i] =
@@ -133,7 +119,6 @@ export class RowManager {
       buffer: this.noViewBuffer.buffer,
       numRows: this.rowData.arr.length,
     };
-    this.numCols = this.rowData.arr[0]?.cells.length ?? 0;
 
     this.grid.scrollbar.setScrollOffsetY(this.grid.offsetY);
     this.grid.scrollbar.setScrollOffsetX(this.grid.offsetX);
@@ -150,98 +135,19 @@ export class RowManager {
       console.log("Ms to send rows to worker", performance.now() - t0);
     });
   };
-  // filterBy = async (query: string) => {
-  //   const t0 = performance.now();
-
-  //   const computedRows = await (async () => {
-  //     if (query == null) {
-  //       return { result: null, cancel: false };
-  //     }
-  //     const filterId = this.currentFilterId + 1;
-  //     this.currentFilterId = filterId;
-  //     const shouldCancel = () => {
-  //       return this.currentFilterId !== filterId;
-  //     };
-  //     const onEarlyResults = (rows: Row[]) => {
-  //       this.computedRows = rows;
-  //       this.grid.renderViewportRows();
-  //       this.grid.renderViewportCells();
-  //       // NOTE(gab): clamps scroll offset into viewport, if rows are filtered away
-  //       // TODO(gab): this makes filtering feel snappier but the scrollbar size will jump a bit.
-  //       // estimate the scrollbar size instead given how many results we have now and use that instead.
-  //       this.grid.scrollbar.clampThumbIfNeeded();
-  //     };
-  //     const computedRows = await filterRows({
-  //       query,
-  //       rows: Object.values(this.rows),
-  //       rowsPerViewport: this.grid.getState().rowsPerViewport,
-  //       onEarlyResults,
-  //       shouldCancel,
-  //     });
-  //     if (computedRows == "canceled") {
-  //       return { result: null, cancel: true };
-  //     }
-  //     return { result: computedRows, cancel: false };
-  //   })();
-
-  //   if (computedRows.cancel) {
-  //     return;
-  //   }
-  //   this.computedRows = computedRows.result;
-
-  //   this.grid.scrollbar.clampThumbIfNeeded();
-  //   this.grid.renderViewportRows();
-  //   this.grid.renderViewportCells();
-  //   // NOTE(gab): refresh size of thumb after completely done filtering, to prevent jumping of size
-  //   this.grid.scrollbar.refreshThumb();
-
-  //   const ms = performance.now() - t0;
-  //   prevFilterMs.push(ms);
-  //   const avgFilterMs =
-  //     prevFilterMs.reduce((a, b) => a + b, 0) / prevFilterMs.length;
-  //   console.log(`Filtering took ${ms}. Avg: ${avgFilterMs}`);
-  // };
-
   isViewEmpty = () => {
-    return this.view.filter.length === 0 && this.view.sort == null;
+    return isEmptyFast(this.view.filter) && isEmptyFast(this.view.sort);
   };
-
-  updateFilterOrCreateNew = (query: string) => {
-    const filter = this.view.filter.find((f) => f.column === FILTER_COL);
-    if (filter != null) {
-      filter.query = query;
-    } else {
-      this.view.filter.push({
-        type: "string",
-        column: FILTER_COL,
-        query,
-      });
-    }
-  };
-
-  multithreadFilterBy = async (query: string) => {
+  runFilter = async () => {
     console.count("---------- start filter");
     this.view.version = Date.now();
-    if (query === "") {
-      // hack for only filtering one col for now
-      const filterIndex = this.view.filter.findIndex(
-        (f) => f.column === FILTER_COL
-      );
-      this.view.filter.splice(filterIndex, 1);
-      // ----------------
 
-      if (this.isViewEmpty()) {
-        this.isViewResult = false;
-      }
-
+    if (this.isViewEmpty()) {
+      this.isViewResult = false;
       this.grid.renderViewportRows();
       this.grid.renderViewportCells();
       this.grid.scrollbar.refreshThumb();
     } else {
-      this.updateFilterOrCreateNew(query);
-    }
-
-    if (!this.isViewEmpty()) {
       viewWorker.postMessage({
         type: "compute-view",
         viewConfig: this.view,
@@ -250,31 +156,16 @@ export class RowManager {
       } satisfies ComputeViewEvent);
     }
   };
-  multithreadSortBy = async (sort: "ascending" | "descending" | null) => {
+  runSort = async () => {
     console.count("---------- start sort");
     this.view.version = Date.now();
-    if (sort == null) {
-      this.view.sort = null;
-      console.log(
-        "sort null",
-        this.isViewEmpty(),
-        this.view.filter,
-        this.view.sort
-      );
-      if (this.isViewEmpty()) {
-        this.isViewResult = false;
-      }
 
+    if (this.isViewEmpty()) {
+      this.isViewResult = false;
       this.grid.renderViewportRows();
       this.grid.renderViewportCells();
       this.grid.scrollbar.refreshThumb();
     } else {
-      this.view.sort = {
-        column: SORT_COL,
-        direction: sort,
-      };
-    }
-    if (!this.isViewEmpty()) {
       viewWorker.postMessage({
         type: "compute-view",
         viewConfig: this.view,
