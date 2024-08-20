@@ -2,7 +2,6 @@ import {
   useState,
   useRef,
   useEffect,
-  FC,
   SetStateAction,
   Dispatch,
   FC,
