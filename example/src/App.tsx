@@ -48,20 +48,20 @@ export const FastGrid = () => {
         filters[4] =
           (filters[4] ?? "") + Math.floor(Math.random() * 10).toString();
       } else {
-        filters[4] = "";
+        delete filters[4];
       }
 
       // manually trigger refresh of filter cells.. make it part of updating the filter
       for (const header of grid.headerRows) {
         for (const cell of Object.values(header.cellComponentMap)) {
           if (cell instanceof FilterCell) {
-            cell.syncToFilter();
             if (cell.index === 4) {
               cell.el.style.backgroundColor = "rgb(239, 68, 68)";
               cell.input.style.backgroundColor = "rgb(239, 68, 68)";
               cell.input.style.color = "white";
               cell.input.placeholder = "";
               cell.arrow.style.fill = "white";
+              cell.syncToFilter();
             }
           }
         }
@@ -74,17 +74,19 @@ export const FastGrid = () => {
       for (const header of grid.headerRows) {
         for (const cell of Object.values(header.cellComponentMap)) {
           if (cell instanceof FilterCell) {
-            cell.syncToFilter();
             if (cell.index === 4) {
+              delete grid.rowManager.view.filter[4];
               cell.el.style.backgroundColor = "white";
               cell.input.style.backgroundColor = "white";
               cell.input.style.color = "black";
               cell.input.placeholder = "filter...";
               cell.arrow.style.fill = "black";
+              cell.syncToFilter();
             }
           }
         }
       }
+      grid.rowManager.runFilter();
       clearInterval(id);
     };
   }, [grid, stressTest]);
