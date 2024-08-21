@@ -7,9 +7,14 @@ export type CellComponent = {
   el: HTMLDivElement;
   _offset: number;
 
-  setContent: (text: string) => void;
+  setContent: (text: string | number) => void;
   setOffset: (offset: number, force?: boolean) => void;
-  reuse: (id: number, offset: number, text: string, index: number) => void;
+  reuse: (
+    id: number,
+    offset: number,
+    text: string | number,
+    index: number
+  ) => void;
 };
 
 export class StringCell implements CellComponent {
@@ -17,7 +22,7 @@ export class StringCell implements CellComponent {
   el: HTMLDivElement;
   _offset: number;
 
-  constructor(id: number, offset: number, text: string) {
+  constructor(id: number, offset: number, text: string | number) {
     this.id = id;
     this._offset = offset;
 
@@ -34,8 +39,8 @@ export class StringCell implements CellComponent {
     this.setContent(text);
   }
 
-  setContent(text: string) {
-    this.el.innerText = text;
+  setContent(text: string | number) {
+    this.el.innerText = String(text);
   }
   setOffset(offset: number, force: boolean = false) {
     if (force || offset !== this._offset) {
@@ -43,7 +48,7 @@ export class StringCell implements CellComponent {
     }
     this._offset = offset;
   }
-  reuse(id: number, offset: number, text: string) {
+  reuse(id: number, offset: number, text: string | number) {
     this.id = id;
     this.setOffset(offset, true);
     this.setContent(text);
@@ -55,7 +60,7 @@ export class HeaderCell implements CellComponent {
   el: HTMLDivElement;
   _offset: number;
 
-  constructor(id: number, offset: number, text: string) {
+  constructor(id: number, offset: number, text: string | number) {
     this.id = id;
     this._offset = offset;
 
@@ -74,8 +79,8 @@ export class HeaderCell implements CellComponent {
     this.setContent(text);
   }
 
-  setContent(text: string) {
-    this.el.innerText = text;
+  setContent(text: string | number) {
+    this.el.innerText = String(text);
   }
   setOffset(offset: number, force: boolean = false) {
     if (force || offset !== this._offset) {
@@ -83,7 +88,7 @@ export class HeaderCell implements CellComponent {
     }
     this._offset = offset;
   }
-  reuse(id: number, offset: number, text: string) {
+  reuse(id: number, offset: number, text: string | number) {
     this.id = id;
     this.setOffset(offset, true);
     this.setContent(text);
@@ -102,7 +107,7 @@ export class FilterCell implements CellComponent {
   constructor(
     id: number,
     offset: number,
-    text: string,
+    text: string | number,
     grid: Grid,
     index: number
   ) {
@@ -118,7 +123,7 @@ export class FilterCell implements CellComponent {
 
     this.input = document.createElement("input");
     this.input.type = "text";
-    this.input.value = text;
+    this.input.value = String(text);
     this.input.className =
       "w-full h-full border-none outline-none text-[13px] select-none";
     this.input.style.fontFamily = "monospace";
@@ -128,7 +133,7 @@ export class FilterCell implements CellComponent {
 
     const arrowContainer = document.createElement("div");
     arrowContainer.className =
-      "flex items-center justify-center w-[30px] h-[28px] cursor-pointer";
+      "flex items-center justify-center w-[35px] h-[28px] cursor-pointer";
     arrowContainer.addEventListener("click", this.onArrowClick);
 
     this.arrow = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -136,7 +141,7 @@ export class FilterCell implements CellComponent {
     this.arrow.setAttribute("viewBox", "0 0 24 24");
     this.arrow.setAttribute(
       "class",
-      "w-4 h-4 fill-current transition-transform duration-200 rotate-90"
+      "w-5 h-5 fill-current transition-transform duration-200 rotate-90"
     );
 
     const mainPath = document.createElementNS(
@@ -221,7 +226,12 @@ export class FilterCell implements CellComponent {
     }
     this._offset = offset;
   };
-  reuse = (id: number, offset: number, _text: string, index: number) => {
+  reuse = (
+    id: number,
+    offset: number,
+    _text: string | number,
+    index: number
+  ) => {
     this.id = id;
     this.index = index;
     this.setOffset(offset, true);

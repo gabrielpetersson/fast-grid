@@ -25,32 +25,28 @@ export const generateRows = async (
       await yieldControl("background"); // so we don't drop frames generating rows
       grid.rowManager.setRows(rows, true);
     }
-    const cells: Cell[] = [
-      { id: -rowIdx - 1, text: String(rowIdx + 1), val: rowIdx },
-    ];
+    const cells: Cell[] = [{ id: -rowIdx - 1, v: String(rowIdx + 1) }];
     for (let cellIdx = 0; cellIdx < N_COLS; cellIdx++) {
-      let text: string;
+      let value: string | number;
       if (cellIdx === 0) {
-        text = FIRST_NAMES[Math.floor(Math.random() * FIRST_NAMES.length)];
+        value = FIRST_NAMES[Math.floor(Math.random() * FIRST_NAMES.length)];
       } else if (cellIdx === 1) {
-        text = LAST_NAMES[Math.floor(Math.random() * LAST_NAMES.length)];
+        value = LAST_NAMES[Math.floor(Math.random() * LAST_NAMES.length)];
       } else if (cellIdx === 2) {
-        const age = Math.floor(Math.random() * (99 - 18 + 1)) + 18;
-        text = String(age);
+        value = Math.floor(Math.random() * (99 - 18 + 1)) + 18;
       } else {
-        const v = Math.round(skewedRandom() * (Math.random() * 1000000));
-        text = String(v);
+        value = Math.round(skewedRandom() * (Math.random() * 1000000));
       }
       cells.push({
         id: cellIndex,
-        text: text,
-        val: cellIdx > 1 ? parseInt(text) : 0, // TODO(gab): rm field
+        v: value,
       });
       cellIndex += 1;
     }
     const row = { id: rowIdx, cells } satisfies Row;
     rows[row.id] = row;
   }
+  await yieldControl("background");
   grid.rowManager.setRows(rows);
   cb();
 };

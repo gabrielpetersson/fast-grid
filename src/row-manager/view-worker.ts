@@ -58,7 +58,7 @@ const filterRows = async ({
 
       for (const column in lowerCaseFilter) {
         const query = lowerCaseFilter[column];
-        if (row.cells[column].text.toLowerCase().indexOf(query) === -1) {
+        if (String(row.cells[column].v).indexOf(query) === -1) {
           matchesFilter = false;
           break;
         }
@@ -84,15 +84,15 @@ const getSortComparisonFn = (
         continue;
       }
       if (direction === "ascending") {
-        if (a.cells[colIndex].text > b.cells[colIndex].text) {
+        if (a.cells[colIndex].v > b.cells[colIndex].v) {
           return 1;
-        } else if (a.cells[colIndex].text < b.cells[colIndex].text) {
+        } else if (a.cells[colIndex].v < b.cells[colIndex].v) {
           return -1;
         }
       }
-      if (a.cells[colIndex].text < b.cells[colIndex].text) {
+      if (a.cells[colIndex].v < b.cells[colIndex].v) {
         return 1;
-      } else if (a.cells[colIndex].text > b.cells[colIndex].text) {
+      } else if (a.cells[colIndex].v > b.cells[colIndex].v) {
         return -1;
       }
     }

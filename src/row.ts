@@ -9,8 +9,8 @@ import { Grid } from "./grid";
 
 export type Cell = {
   id: number;
-  text: string;
-  val: number;
+  v: string | number;
+  // val: number;
 };
 
 export interface Row {
@@ -103,7 +103,7 @@ export class RowComponent {
       const reuseCell = removeCells.pop();
       if (reuseCell != null) {
         delete this.cellComponentMap[reuseCell.id];
-        reuseCell.reuse(cell.id, offset, cell.text, i);
+        reuseCell.reuse(cell.id, offset, cell.v, i);
         this.cellComponentMap[reuseCell.id] = reuseCell;
         continue;
       }
@@ -111,7 +111,7 @@ export class RowComponent {
       const newCell = new this.CellRenderer(
         cell.id,
         offset,
-        cell.text,
+        cell.v,
         this.grid,
         i
       );

@@ -174,6 +174,14 @@ export class RowManager {
       } satisfies ComputeViewEvent);
     }
   };
+  destroy = () => {
+    // no memory leaks..
+    // @ts-expect-error
+    this.viewBuffer = null;
+    // @ts-expect-error
+    this.noViewBuffer = null;
+    viewWorker.terminate();
+  };
 }
 
 export type ComputeViewDoneEvent = {

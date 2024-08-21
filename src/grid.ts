@@ -97,8 +97,7 @@ export class Grid {
       HEADER_ID,
       headers.map((_, i) => ({
         id: i,
-        text: "",
-        val: 0,
+        v: "",
       })),
       offset,
       FilterCell
@@ -108,8 +107,7 @@ export class Grid {
       HEADER_ID,
       headers.map((header, i) => ({
         id: i,
-        text: header,
-        val: 0,
+        v: header,
       })),
       (offset += ROW_HEIGHT),
       HeaderCell
@@ -326,6 +324,9 @@ export class Grid {
   destroy = () => {
     for (const id in this.rowComponentMap) {
       this.rowComponentMap[id].destroy();
+    }
+    for (const row of this.headerRows) {
+      row.destroy();
     }
     this.resizeObserver.disconnect();
   };
