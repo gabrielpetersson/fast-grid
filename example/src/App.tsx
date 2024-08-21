@@ -1,27 +1,19 @@
-import {
-  useState,
-  useRef,
-  useEffect,
-  SetStateAction,
-  Dispatch,
-  FC,
-} from "react";
-import { FilterCell, Grid } from "grid";
-import Stats from "stats.js";
 import clsx from "clsx";
+import Stats from "stats.js";
 import { Analytics } from "@vercel/analytics/react";
+import { FilterCell, Grid } from "grid";
 import { COLUMNS, generateRows } from "./generateRows";
+import { useState, useRef, useEffect } from "react";
 
 export const FastGrid = () => {
-  const [grid, setGrid] = useState<Grid | null>(null);
-  const [autoScroller, setAutoScroller] = useState<AutoScroller | null>(null);
-  const [isAutoScroll, setIsAutoScroll] = useState<boolean>(
-    window.innerWidth > 1000
-  );
-  const [loadingRows, setLoadingRows] = useState<boolean>(false);
-  const [isAutoFilter, setIsAutoFilter] = useState<boolean>(false);
-  const [rowCount, setRowCount] = useState<number>(100_000);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const [grid, setGrid] = useState<Grid | null>(null);
+  const [speed, setSpeed] = useState(0);
+  const [rowCount, setRowCount] = useState(100_000);
+  const [stressTest, setStressTest] = useState(false);
+  const [loadingRows, setLoadingRows] = useState(false);
+  const [autoScroller, setAutoScroller] = useState<AutoScroller | null>(null);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -35,33 +27,29 @@ export const FastGrid = () => {
     setGrid(grid);
     console.info("Ms to intitialize grid:", performance.now() - t0);
 
-    // misc
-    (window as any).__grid = grid;
-    setupFPS();
+    setLoadingRows(true);
+    generateRows(rowCount, grid, () => setLoadingRows(false));
 
     // setup autoscroller
     const autoScroller = new AutoScroller(grid);
     setAutoScroller(autoScroller);
+    (window as any).__grid = grid;
     return () => {
       grid.destroy();
-      autoScroller.stop();
     };
-  }, []);
+  }, [rowCount]);
 
   useEffect(() => {
-    if (grid == null || !isAutoFilter) return;
+    if (grid == null || !stressTest) return;
     const id = setInterval(() => {
       const filters = grid.rowManager.view.filter;
 
-      const updateFilter = (filter: string) => {
-        if (filter.length < 5) {
-          return filter + Math.floor(Math.random() * 10).toString();
-        } else {
-          return "";
-        }
-      };
-
-      filters[4] = updateFilter(filters[4] || "");
+      if (filters[4] == null || filters[4].length < 5) {
+        filters[4] =
+          (filters[4] ?? "") + Math.floor(Math.random() * 10).toString();
+      } else {
+        filters[4] = "";
+      }
 
       // manually trigger refresh of filter cells.. make it part of updating the filter
       for (const header of grid.headerRows) {
@@ -75,180 +63,130 @@ export const FastGrid = () => {
       grid.rowManager.runFilter();
     }, 333);
     return () => clearInterval(id);
-  }, [grid, isAutoFilter]);
-
-  useEffect(() => {
-    if (grid == null) return;
-    setLoadingRows(true);
-    generateRows(rowCount, grid, () => setLoadingRows(false));
-  }, [rowCount, grid]);
+  }, [grid, stressTest]);
 
   useEffect(() => {
     if (autoScroller == null) return;
-    isAutoScroll ? autoScroller.start() : autoScroller.stop();
-  }, [autoScroller, isAutoScroll]);
+    const adjustedSpeed =
+      speed < 100 ? Math.pow(speed / 7, 1.2) : Math.pow(speed, 1.2);
+    autoScroller.start(adjustedSpeed);
+  }, [autoScroller, speed]);
 
   return (
     <>
       <Analytics />
-      <h1 className="self-start text-xl font-bold lg:self-center lg:text-3xl">
+      <h1 className="self-start text-lg font-bold sm:self-center md:text-3xl">
         World's most performant DOM-based table
       </h1>
-      <a
-        className="self-start text-sm text-blue-600 underline hover:text-blue-800 lg:mt-2 lg:self-center"
-        href="https://github.com/gabrielpetersson/fast-grid/"
-      >
-        {"https://github.com/gabrielpetersson/fast-grid/"}
-      </a>
-      <div className="flex h-6 items-center justify-center pt-1 text-[11px] leading-3 text-gray-800 lg:h-8 lg:pt-2">
-        {isAutoFilter && isAutoScroll
-          ? `The grid is now filtering ${rowCount
-              .toLocaleString("en-US", {
-                minimumFractionDigits: 0,
-                useGrouping: true,
-                currencyDisplay: "narrowSymbol",
-                currency: "USD",
-              })
-              .replace(
-                /,/g,
-                " "
-              )} rows every 300ms, while scrolling a full viewport every frame (16ms)`
-          : null}
-        {loadingRows ? "Generating rows..." : null}
+      <div className="mt-1 self-start max-md:mt-2 sm:self-center">
+        Try make the fps counter drop by filtering, sorting, or throttling cpu.
       </div>
+      <div className="mb-4 mt-1 self-start text-sm max-md:mt-2 sm:self-center sm:text-[13px]">
+        See code:
+        <a
+          className="ml-1 text-blue-600 underline hover:text-blue-800"
+          href="https://github.com/gabrielpetersson/fast-grid/"
+        >
+          https://github.com/gabrielpetersson/fast-grid/
+        </a>
+      </div>
+
       <div
         className={clsx(
-          box,
-          "mt-2 flex h-[30px] w-full cursor-pointer select-none items-center justify-center rounded border border-gray-600 bg-blue-500 text-white hover:opacity-95 active:opacity-90 lg:hidden"
-        )}
-        onClick={() => {
-          setIsAutoFilter(!(isAutoFilter && isAutoScroll));
-          setIsAutoScroll(!(isAutoFilter && isAutoScroll));
-        }}
-      >
-        Press here to max out the grid
-      </div>
-      <div
-        className={clsx(
-          "flex w-full select-none flex-wrap justify-between gap-2 py-2 text-[11px] text-white",
+          "flex w-full select-none flex-wrap justify-between gap-2 py-2",
           loadingRows && "pointer-events-none select-none opacity-60"
         )}
       >
-        <PrimaryButtons
-          isAutoFilter={isAutoFilter}
-          isAutoScroll={isAutoScroll}
-          setIsAutoScroll={setIsAutoScroll}
-          setIsAutoFilter={setIsAutoFilter}
-        />
-        <div className="flex h-[28px] flex-1 items-center justify-center text-[10px] text-black sm:text-xs md:text-[13px]">
-          Challenge: make the fps counter in the bottom right corner drop by
-          filtering / sorting / throttling cpu
-        </div>
-        <div className="flex w-[300px] justify-end">
-          <select
-            value={rowCount}
-            onChange={(e) => setRowCount(Number(e.target.value))}
+        <div className="hidden w-[150px] md:block" />
+
+        <div className="flex gap-2 text-[11px] md:gap-8 md:text-[13px]">
+          <div className="flex items-center">
+            <span className="mr-2 whitespace-nowrap">Scroll speed:</span>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={speed}
+              onChange={(e) => setSpeed(Number(e.target.value))}
+              className={clsx(
+                "h-2 w-full cursor-pointer appearance-none rounded-full bg-gray-300",
+                speed === 100 &&
+                  "[&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:bg-red-500 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-red-500"
+              )}
+            />
+          </div>
+
+          <button
             className={clsx(
-              "flex h-[28px] w-[150px] items-center justify-center rounded border border-gray-800 bg-white text-gray-700",
-              box
+              "flex h-[28px] w-[200px] items-center justify-center gap-0.5 rounded bg-blue-500 text-white hover:opacity-95 active:opacity-90",
+              stressTest && "bg-red-500"
             )}
+            onClick={() => {
+              if (stressTest) {
+                setStressTest(false);
+                setSpeed(0);
+              } else {
+                setStressTest(true);
+                setSpeed(100);
+              }
+            }}
           >
-            <option value={10}>10 rows</option>
-            <option value={10_000}>10 000 rows</option>
-            <option value={100_000}>100 000 rows</option>
-            <option value={500_000}>500 000 rows</option>
-            <option value={1_000_000}>
-              1 000 000 rows (might run out of ram)
-            </option>
-            <option value={2_000_000}>
-              2 000 000 rows (might run out of ram)
-            </option>
-            <option value={5_000_000}>
-              5 000 000 rows (might run out of ram)
-            </option>
-            <option value={10_000_000}>
-              10 000 000 rows (might run out of ram)
-            </option>
-          </select>
+            {stressTest && (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-[14px] w-[14px]"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            )}
+            {stressTest ? "Filtering 3 times per second" : "Stress test"}
+          </button>
         </div>
+
+        <select
+          value={rowCount}
+          onChange={(e) => {
+            if (grid == null) return;
+            setRowCount(Number(e.target.value));
+          }}
+          className="hidden h-[28px] w-[150px] items-center justify-center rounded border border-gray-800 bg-white text-[12px] text-gray-700 shadow-[rgba(0,_0,_0,_0.1)_0px_0px_2px_1px] md:flex"
+        >
+          <option value={10}>10 rows</option>
+          <option value={10_000}>10 000 rows</option>
+          <option value={100_000}>100 000 rows</option>
+          <option value={500_000}>500 000 rows</option>
+          <option value={1_000_000}>
+            1 000 000 rows (might run out of ram)
+          </option>
+          <option value={2_000_000}>
+            2 000 000 rows (might run out of ram)
+          </option>
+          <option value={5_000_000}>
+            5 000 000 rows (might run out of ram)
+          </option>
+          <option value={10_000_000}>
+            10 000 000 rows (might run out of ram)
+          </option>
+        </select>
       </div>
       <div
         ref={containerRef} // attaching grid here
         style={{
           contain: "strict",
         }}
-        className="relative box-border w-full flex-1 overflow-clip border border-gray-700 bg-white"
+        className={clsx(
+          "relative box-border w-full flex-1 overflow-clip border border-gray-700 bg-white",
+          loadingRows && "pointer-events-none opacity-70"
+        )}
       />
     </>
-  );
-};
-
-const box = "shadow-[rgba(0,_0,_0,_0.1)_0px_0px_2px_1px]";
-
-interface PrimaryButtonsProps {
-  isAutoFilter: boolean;
-  isAutoScroll: boolean;
-  setIsAutoScroll: Dispatch<SetStateAction<boolean>>;
-  setIsAutoFilter: Dispatch<SetStateAction<boolean>>;
-}
-const PrimaryButtons: FC<PrimaryButtonsProps> = ({
-  isAutoFilter,
-  isAutoScroll,
-  setIsAutoScroll,
-  setIsAutoFilter,
-}) => {
-  return (
-    <div className="flex w-[300px] gap-2">
-      <Checkbox
-        active={isAutoScroll}
-        onClick={() => setIsAutoScroll((p) => !p)}
-      >
-        Auto scroll
-      </Checkbox>
-      <Checkbox
-        active={isAutoFilter}
-        onClick={() => setIsAutoFilter((p) => !p)}
-      >
-        Auto filter
-      </Checkbox>
-      <div
-        onClick={() => {
-          setIsAutoFilter(!(isAutoFilter && isAutoScroll));
-          setIsAutoScroll(!(isAutoFilter && isAutoScroll));
-        }}
-        className={
-          "hidden h-[28px] cursor-pointer items-center text-gray-800 hover:opacity-70 lg:flex lg:w-auto"
-        }
-      >
-        {"← Turn on both!"}
-      </div>
-    </div>
-  );
-};
-
-interface CheckboxProps {
-  children: string;
-  active: boolean;
-  onClick: () => void;
-}
-const Checkbox: FC<CheckboxProps> = ({ children, active, onClick }) => {
-  return (
-    <div
-      onClick={onClick}
-      className={clsx(
-        "flex h-[28px] w-[150px] cursor-pointer rounded border border-gray-800 lg:w-[70px]",
-        box
-      )}
-    >
-      <div
-        className={clsx(
-          "flex flex-1 items-center justify-center",
-          active ? "bg-red-500" : "text-gray-700"
-        )}
-      >
-        {children}
-      </div>
-    </div>
   );
 };
 
@@ -259,6 +197,14 @@ const setupFPS = () => {
   stats.dom.style.left = "unset";
   stats.dom.style.bottom = "0";
   stats.dom.style.right = "0";
+
+  for (const child of stats.dom.children) {
+    // @ts-expect-error ddd
+    child.style.width = "160px";
+    // @ts-expect-error ddd
+    child.style.height = "96px";
+  }
+
   document.body.appendChild(stats.dom);
   const animate = () => {
     stats.update();
@@ -266,21 +212,27 @@ const setupFPS = () => {
   };
   window.requestAnimationFrame(animate);
 };
+setupFPS();
 
 class AutoScroller {
   grid: Grid;
   running: boolean;
   toBottom: boolean;
+  version: number;
   constructor(grid: Grid) {
     this.grid = grid;
     this.running = true;
     this.toBottom = true;
+    this.version = 0;
   }
-  start() {
-    this.running = true;
+  start(speed: number) {
+    this.version++;
+
+    const currentVersion = this.version;
+
     const cb = () => {
       const state = this.grid.getState();
-      if (!this.running) {
+      if (this.version !== currentVersion) {
         return;
       }
 
@@ -292,12 +244,7 @@ class AutoScroller {
       } else if (this.grid.offsetY <= 0) {
         this.toBottom = true;
       }
-
-      // const delta = this.toBottom
-      //   ? this.grid.viewportHeight
-      //   : -this.grid.viewportHeight;
-
-      const delta = this.toBottom ? 2 : -2;
+      const delta = this.toBottom ? speed : -speed;
 
       const wheelEvent = new WheelEvent("wheel", {
         deltaY: delta,
@@ -308,8 +255,5 @@ class AutoScroller {
       window.requestAnimationFrame(cb);
     };
     window.requestAnimationFrame(cb);
-  }
-  stop() {
-    this.running = false;
   }
 }

@@ -108,7 +108,7 @@ export class RowManager {
   getNumRows = () => {
     return this.getViewBuffer().numRows;
   };
-  setRows = (rows: Rows) => {
+  setRows = (rows: Rows, skipSendToWorker: boolean = false) => {
     this.rowData = { obj: rows, arr: Object.values(rows), version: Date.now() };
 
     for (let i = 0; i < this.rowData.arr.length; i++) {
@@ -125,15 +125,16 @@ export class RowManager {
     this.grid.renderViewportRows();
     this.grid.scrollbar.refreshThumb();
 
-    // TODO: this is blocking wtf, gotta split this up
-    setTimeout(() => {
+    if (!skipSendToWorker) {
+      // TODO: this is blocking wtf, gotta split this up
+
       const t0 = performance.now();
       viewWorker.postMessage({
         type: "set-rows",
         rows: this.rowData.obj,
       } satisfies SetRowsEvent);
       console.log("Ms to send rows to worker", performance.now() - t0);
-    });
+    }
   };
   isViewEmpty = () => {
     return isEmptyFast(this.view.filter) && isEmptyFast(this.view.sort);

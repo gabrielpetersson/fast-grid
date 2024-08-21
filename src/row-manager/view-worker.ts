@@ -260,11 +260,12 @@ const handleEvent = async (event: Message) => {
       return;
     }
     case "set-rows": {
-      rowData = {
-        obj: message.rows,
-        arr: Object.values(message.rows),
-        version: Date.now(),
-      };
+      for (const id in message.rows) {
+        rowData.obj[id] = message.rows[id];
+        rowData.arr.push(message.rows[id]);
+      }
+
+      rowData.version = Date.now();
       cache.sort = null;
       return;
     }

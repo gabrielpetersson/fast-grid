@@ -23,6 +23,7 @@ export const generateRows = async (
   for (let rowIdx = 0; rowIdx < rowCount; rowIdx++) {
     if (rowIdx % 10000 === 0 && isTimeToYield("background")) {
       await yieldControl("background"); // so we don't drop frames generating rows
+      grid.rowManager.setRows(rows, true);
     }
     const cells: Cell[] = [
       { id: -rowIdx - 1, text: String(rowIdx + 1), val: rowIdx },
