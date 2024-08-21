@@ -56,20 +56,42 @@ export const FastGrid = () => {
         for (const cell of Object.values(header.cellComponentMap)) {
           if (cell instanceof FilterCell) {
             cell.syncToFilter();
+            if (cell.index === 4) {
+              cell.el.style.backgroundColor = "rgb(239, 68, 68)";
+              cell.input.style.backgroundColor = "rgb(239, 68, 68)";
+              cell.input.style.color = "white";
+              cell.input.placeholder = "";
+              cell.arrow.style.fill = "white";
+            }
           }
         }
       }
 
       grid.rowManager.runFilter();
     }, 333);
-    return () => clearInterval(id);
+    return () => {
+      // manually trigger refresh of filter cells.. make it part of updating the filter
+      for (const header of grid.headerRows) {
+        for (const cell of Object.values(header.cellComponentMap)) {
+          if (cell instanceof FilterCell) {
+            cell.syncToFilter();
+            if (cell.index === 4) {
+              cell.el.style.backgroundColor = "white";
+              cell.input.style.backgroundColor = "white";
+              cell.input.style.color = "black";
+              cell.input.placeholder = "filter...";
+              cell.arrow.style.fill = "black";
+            }
+          }
+        }
+      }
+      clearInterval(id);
+    };
   }, [grid, stressTest]);
 
   useEffect(() => {
     if (autoScroller == null) return;
-    const adjustedSpeed =
-      speed < 100 ? Math.pow(speed / 7, 1.2) : Math.pow(speed, 1.2);
-    autoScroller.start(adjustedSpeed);
+    autoScroller.start(speed === 0 ? 0 : Math.exp(speed / 15));
   }, [autoScroller, speed]);
 
   return (
@@ -79,7 +101,8 @@ export const FastGrid = () => {
         World's most performant DOM-based table
       </h1>
       <div className="mt-1 self-start max-md:mt-2 sm:self-center">
-        Try make the fps counter drop by filtering, sorting, or throttling cpu.
+        Try make the fps counter drop by filtering, sorting, and scrolling
+        simultaneously
       </div>
       <div className="mb-4 mt-1 self-start text-sm max-md:mt-2 sm:self-center sm:text-[13px]">
         See code:
@@ -161,6 +184,7 @@ export const FastGrid = () => {
           <option value={10}>10 rows</option>
           <option value={10_000}>10 000 rows</option>
           <option value={100_000}>100 000 rows</option>
+          <option value={200_000}>200 000 rows</option>
           <option value={500_000}>500 000 rows</option>
           <option value={1_000_000}>
             1 000 000 rows (might run out of ram)

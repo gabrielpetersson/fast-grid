@@ -18,7 +18,7 @@ export const generateRows = async (
   grid: Grid,
   cb: () => void
 ) => {
-  const rows: Rows = {};
+  const rows: Rows = [];
   let cellIndex = 0;
   for (let rowIdx = 0; rowIdx < rowCount; rowIdx++) {
     if (rowIdx % 10000 === 0 && isTimeToYield("background")) {
@@ -43,8 +43,7 @@ export const generateRows = async (
       });
       cellIndex += 1;
     }
-    const row = { id: rowIdx, cells } satisfies Row;
-    rows[row.id] = row;
+    rows.push({ id: rowIdx, cells } satisfies Row);
   }
   await yieldControl("background");
   grid.rowManager.setRows(rows);

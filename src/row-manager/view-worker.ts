@@ -1,4 +1,4 @@
-import { ComputeViewDoneEvent, RowData, Rows, View } from "./row-manager";
+import { ComputeViewDoneEvent, Rows, View } from "./row-manager";
 import { Row } from "../row";
 import { sort as timSort } from "./timsort";
 import { Result } from "../utils/result";
@@ -57,8 +57,11 @@ const filterRows = async ({
       let matchesFilter = true;
 
       for (const column in lowerCaseFilter) {
-        const query = lowerCaseFilter[column];
-        if (String(row.cells[column].v).indexOf(query) === -1) {
+        if (
+          String(row.cells[column].v)
+            .toLowerCase()
+            .indexOf(lowerCaseFilter[column]) === -1
+        ) {
           matchesFilter = false;
           break;
         }
@@ -101,26 +104,25 @@ const getSortComparisonFn = (
 };
 
 const computeView = async ({
-  rowData,
+  rows,
   buffer,
   viewConfig,
-  useSortCache,
   shouldCancel,
 }: {
-  rowData: RowData;
+  rows: Rows;
   buffer: Int32Array;
   viewConfig: View;
-  useSortCache: boolean;
   shouldCancel: () => boolean;
 }): Promise<number | "cancelled"> => {
   const sortConfig = viewConfig.sort;
 
-  let rowsArr = rowData.arr;
+  let rowsArr = rows;
 
-  if (useSortCache) {
-    rowsArr = cache.sort ?? rowData.arr;
+  const sortKey = JSON.stringify(sortConfig);
+  if (sortKey === cache.sortKey) {
+    rowsArr = cache.sort ?? rows;
   } else if (!isEmptyFast(sortConfig)) {
-    rowsArr = [...rowData.arr]; // todo: can use a global array reference here and manually check if all references are the same still
+    rowsArr = [...rows]; // todo: can use a global array reference here and manually check if all references are the same still
 
     const start = performance.now();
     const sortResult = await timSort(
@@ -134,6 +136,7 @@ const computeView = async ({
     console.log("sorting took", performance.now() - start);
 
     cache.sort = rowsArr;
+    cache.sortKey = sortKey;
   }
 
   await letOtherEventsThrough();
@@ -213,16 +216,13 @@ const computeView = async ({
   // console.log(`Uint32Array sort took ${end - start}ms`);
 };
 
-let rowData: RowData = {
-  obj: {},
-  arr: [],
-  version: Date.now(),
-};
+let rowData: Rows = [];
 
 let currentFilterId: [number] = [0];
 
 const cache = {
   sort: null as Row[] | null,
+  sortKey: null as string | null,
 };
 
 const handleEvent = async (event: Message) => {
@@ -242,9 +242,8 @@ const handleEvent = async (event: Message) => {
       };
       const numRows = await computeView({
         viewConfig: message.viewConfig,
-        useSortCache: message.useSortCache ?? false,
         buffer: message.viewBuffer,
-        rowData,
+        rows: rowData,
         shouldCancel,
       });
 
@@ -260,12 +259,7 @@ const handleEvent = async (event: Message) => {
       return;
     }
     case "set-rows": {
-      for (const id in message.rows) {
-        rowData.obj[id] = message.rows[id];
-        rowData.arr.push(message.rows[id]);
-      }
-
-      rowData.version = Date.now();
+      rowData = message.rows;
       cache.sort = null;
       return;
     }
@@ -276,7 +270,6 @@ export type ComputeViewEvent = {
   type: "compute-view";
   viewBuffer: Int32Array;
   viewConfig: View;
-  useSortCache?: boolean;
 };
 
 export type SetRowsEvent = {

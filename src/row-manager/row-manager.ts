@@ -6,43 +6,35 @@ import ViewWorker from "./view-worker?worker&inline";
 
 const viewWorker = new ViewWorker();
 
-export type Rows = { [id: number]: Row };
+export type Rows = Row[];
 
 // const prevFilterMs: number[] = [];
 
 // const filterStartTimes: Record<string, number> = {};
 
 type ColumnIndex = number;
-export interface View {
+export type View = {
   filter: Record<ColumnIndex, string>;
   sort: { direction: "ascending" | "descending"; column: ColumnIndex }[]; // is applied in order
   version: number;
-}
+};
 
-export interface RowBuffer {
+export type RowBuffer = {
   buffer: Int32Array;
   numRows: number;
-}
-
-export interface RowData {
-  // duplicate the data so we can access it quickly, both arr & map
-  obj: Rows;
-  arr: Row[];
-  version: number;
-}
+};
 
 export class RowManager {
-  rowData: RowData;
+  rows: Rows;
   grid: Grid;
   view: View;
 
   isViewResult: boolean = false;
   currentFilterId: number;
   viewBuffer: RowBuffer;
-  noViewBuffer: RowBuffer;
   constructor(grid: Grid, rows: Rows) {
     this.grid = grid;
-    this.rowData = { obj: rows, arr: Object.values(rows), version: Date.now() };
+    this.rows = rows;
 
     this.currentFilterId = 0;
     this.view = {
@@ -57,18 +49,6 @@ export class RowManager {
       1_000_000 * Int32Array.BYTES_PER_ELEMENT
     );
     this.viewBuffer = { buffer: new Int32Array(sharedBuffer), numRows: -1 };
-
-    // EHHH this is very dumb, just unifying my array buffer interface between views and not views.. which should just be an iterable index
-    const noViewBuffer = new Int32Array(
-      1_000_000 * Int32Array.BYTES_PER_ELEMENT
-    );
-    for (const id in rows) {
-      noViewBuffer[id] = Number(id);
-    }
-    this.noViewBuffer = {
-      buffer: noViewBuffer,
-      numRows: Object.values(rows).length,
-    };
 
     viewWorker.onmessage = (event: MessageEvent<ComputeViewDoneEvent>) => {
       switch (event.data.type) {
@@ -93,32 +73,21 @@ export class RowManager {
       }
     };
   }
-  reverse = () => {
-    for (let i = this.rowData.arr.length - 1; i >= 0; i--) {
-      this.noViewBuffer.buffer[i] =
-        this.rowData.arr[this.rowData.arr.length - 1 - i].id;
-    }
-  };
-  getViewBuffer = (): RowBuffer => {
+  getViewBuffer = (): RowBuffer | null => {
     if (this.isViewResult) {
       return this.viewBuffer;
     }
-    return this.noViewBuffer;
+    return null;
   };
   getNumRows = () => {
-    return this.getViewBuffer().numRows;
+    const viewBuffer = this.getViewBuffer();
+    if (viewBuffer == null) {
+      return this.rows.length;
+    }
+    return viewBuffer.numRows;
   };
   setRows = (rows: Rows, skipSendToWorker: boolean = false) => {
-    this.rowData = { obj: rows, arr: Object.values(rows), version: Date.now() };
-
-    for (let i = 0; i < this.rowData.arr.length; i++) {
-      this.noViewBuffer.buffer[i] = this.rowData.arr[i].id;
-    }
-
-    this.noViewBuffer = {
-      buffer: this.noViewBuffer.buffer,
-      numRows: this.rowData.arr.length,
-    };
+    this.rows = rows;
 
     this.grid.scrollbar.setScrollOffsetY(this.grid.offsetY);
     this.grid.scrollbar.setScrollOffsetX(this.grid.offsetX);
@@ -127,11 +96,10 @@ export class RowManager {
 
     if (!skipSendToWorker) {
       // TODO: this is blocking wtf, gotta split this up
-
       const t0 = performance.now();
       viewWorker.postMessage({
         type: "set-rows",
-        rows: this.rowData.obj,
+        rows: this.rows,
       } satisfies SetRowsEvent);
       console.log("Ms to send rows to worker", performance.now() - t0);
     }
@@ -153,7 +121,6 @@ export class RowManager {
         type: "compute-view",
         viewConfig: this.view,
         viewBuffer: this.viewBuffer.buffer,
-        useSortCache: true,
       } satisfies ComputeViewEvent);
     }
   };
@@ -175,7 +142,7 @@ export class RowManager {
     }
   };
   destroy = () => {
-    // no memory leaks..
+    // no memory leaks.. make sure gc kicks in asap
     // @ts-expect-error
     this.viewBuffer = null;
     // @ts-expect-error

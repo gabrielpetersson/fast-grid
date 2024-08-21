@@ -1,5 +1,5 @@
 import { CELL_WIDTH, HeaderCell, FilterCell, StringCell } from "./cell";
-import { RowComponent } from "./row";
+import { Row, RowComponent } from "./row";
 import { RowManager, Rows } from "./row-manager/row-manager";
 import { Scrollbar } from "./scrollbar";
 import { TouchScrolling as PhoneControls } from "./utils/touch-scroll";
@@ -231,17 +231,22 @@ export class Grid {
     // 3) remove rows from the DOM
 
     const state = this.getState();
-    const viewBuffer = this.rowManager.getViewBuffer().buffer;
+    const viewBuffer = this.rowManager.getViewBuffer();
 
     const renderRows: Record<string, true> = {};
-    const rowObj = this.rowManager.rowData.obj;
+    const rowsArr = this.rowManager.rows;
 
     for (let i = state.startRow; i < state.endRow; i++) {
-      const row = rowObj[Atomics.load(viewBuffer, i)];
-      if (row == null) {
-        continue;
+      let row: Row;
+      if (viewBuffer == null) {
+        renderRows[i] = true;
+      } else {
+        row = rowsArr[Atomics.load(viewBuffer.buffer, i)];
+        if (row == null) {
+          continue;
+        }
+        renderRows[row.id] = true;
       }
-      renderRows[row.id] = true;
     }
 
     const removeRows: RowComponent[] = [];
@@ -254,8 +259,13 @@ export class Grid {
     }
 
     for (let i = state.startRow; i < state.endRow; i++) {
-      const row = rowObj[Atomics.load(viewBuffer, i)];
-      // const row = rowObj[viewBuffer[i]
+      let row: Row;
+      if (viewBuffer == null) {
+        row = rowsArr[i];
+      } else {
+        row = rowsArr[Atomics.load(viewBuffer.buffer, i)];
+      }
+
       if (row == null) {
         console.error("cannot find row", i);
         continue;
@@ -298,9 +308,15 @@ export class Grid {
   // TODO(gab): should only be done on X scroll, row reusing and creating a new row
   renderViewportCells = () => {
     const state = this.getState();
-    const viewBuffer = this.rowManager.getViewBuffer().buffer;
+    const viewBuffer = this.rowManager.getViewBuffer();
+
     for (let i = state.startRow; i < state.endRow; i++) {
-      const rowComponent = this.rowComponentMap[Atomics.load(viewBuffer, i)];
+      let rowComponent: RowComponent | null = null;
+      if (viewBuffer != null) {
+        rowComponent = this.rowComponentMap[Atomics.load(viewBuffer.buffer, i)];
+      } else {
+        rowComponent = this.rowComponentMap[i];
+      }
       if (rowComponent == null) {
         console.error("row should exist. did you render rows first?");
         continue;
