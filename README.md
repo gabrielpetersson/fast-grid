@@ -1,4 +1,4 @@
-# fast-grid - [Try it!](https://fast-grid.vercel.app)
+# World's most performant web table - [Try it!](https://fast-grid.vercel.app)
 
 A multithreaded web table, capable of running 120fps while sorting/filtering/scrolling simultaneously
 
