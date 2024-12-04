@@ -18,6 +18,8 @@ export interface Row {
   cells: Cell[];
 }
 
+export type Rows = Row[];
+
 type CellRenderer = typeof StringCell | typeof HeaderCell | typeof FilterCell;
 
 export class RowComponent {

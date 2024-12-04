@@ -1,0 +1,40 @@
+{
+  "name": "@repo/fast-grid",
+  "version": "0.0.1",
+  "type": "module",
+  "private": false,
+  "main": "./dist/fast-grid.umd.js",
+  "module": "./dist/fast-grid.es.js",
+  "types": "./dist/index.d.ts",
+  "style": "./dist/style.css",
+  "exports": {
+    ".": {
+      "import": "./dist/fast-grid.es.js",
+      "require": "./dist/fast-grid.umd.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./style.css": "./dist/style.css"
+  },
+  "scripts": {
+    "dev": "vite build --watch",
+    "build": "vite build && tsc --emitDeclarationOnly",
+    "lint": "eslint . --max-warnings 0",
+    "check-types": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.24",
+    "@types/timsort": "^0.3.3",
+    "autoprefixer": "^10.4.18",
+    "postcss": "^8.4.35",
+    "tailwindcss": "^3.4.1",
+    "typescript": "5.5.4",
+    "vite": "^5.4.0",
+    "vite-plugin-dts": "^3.7.3"
+  },
+  "dependencies": {
+    "apache-arrow": "^18.0.0",
+    "fast-sort": "^3.4.1",
+    "main-thread-scheduling": "8.0.0",
+    "timsort": "^0.3.0"
+  }
+}

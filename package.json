@@ -1,20 +1,21 @@
 {
-  "name": "test",
+  "name": "my-turborepo",
   "private": true,
-  "version": "0.0.0",
   "scripts": {
-    "ts": "tsc --watch --noEmit",
-    "predeploy": "cd example && npm run build"
+    "build": "turbo build",
+    "dev": "turbo dev",
+    "lint": "turbo lint",
+    "preview": "turbo preview",
+    "predeploy": "turbo run build",
+    "format": "prettier --write \"**/*.{ts,tsx,md}\""
   },
   "devDependencies": {
-    "typescript": "5.0.2",
-    "vite": "4.3.2"
+    "prettier": "^3.2.5",
+    "turbo": "^2.3.0",
+    "typescript": "5.5.4"
   },
-  "dependencies": {
-    "@types/timsort": "^0.3.1",
-    "apache-arrow": "^13.0.0",
-    "fast-sort": "^3.4.0",
-    "main-thread-scheduling": "8.0.0",
-    "timsort": "^0.3.0"
+  "packageManager": "pnpm@9.0.0",
+  "engines": {
+    "node": ">=18"
   }
 }

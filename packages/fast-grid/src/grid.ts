@@ -1,6 +1,6 @@
 import { CELL_WIDTH, HeaderCell, FilterCell, StringCell } from "./cell";
-import { Row, RowComponent } from "./row";
-import { RowManager, Rows } from "./row-manager/row-manager";
+import { Row, Rows, RowComponent } from "./row";
+import { RowManager } from "./row-manager/row-manager";
 import { Scrollbar } from "./scrollbar";
 import { TouchScrolling as PhoneControls } from "./utils/touch-scroll";
 

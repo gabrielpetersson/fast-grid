@@ -2,6 +2,7 @@ import { Grid } from "../grid";
 import { Row } from "../row";
 import { isEmptyFast } from "../utils/is-empty-fast";
 import { ComputeViewEvent, SetRowsEvent } from "./view-worker";
+// @ts-expect-error
 import ViewWorker from "./view-worker?worker&inline";
 
 const viewWorker = new ViewWorker();

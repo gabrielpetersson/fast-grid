@@ -1,7 +1,5 @@
 import { isTimeToYield, yieldControl } from "main-thread-scheduling";
-import { Grid } from "../../src/grid";
-import { Cell, Row } from "../../src/row";
-import { Rows } from "../../src/row-manager/row-manager";
+import { Grid, Cell, Row, Rows } from "@repo/fast-grid";
 
 const N_COLS = 15;
 
