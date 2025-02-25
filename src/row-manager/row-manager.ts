@@ -45,10 +45,16 @@ export class RowManager {
 
     viewWorker.postMessage({ type: "set-rows", rows } satisfies SetRowsEvent);
 
-    const sharedBuffer = new SharedArrayBuffer(
-      1_000_000 * Int32Array.BYTES_PER_ELEMENT
-    );
-    this.viewBuffer = { buffer: new Int32Array(sharedBuffer), numRows: -1 };
+    const isIPhoneSafari = /iPhone/.test(navigator.userAgent) && /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent);
+
+    if (!isIPhoneSafari) {
+      const sharedBuffer = new SharedArrayBuffer(
+        1_000_000 * Int32Array.BYTES_PER_ELEMENT
+      );
+      this.viewBuffer = { buffer: new Int32Array(sharedBuffer), numRows: -1 };
+    } else {
+      this.viewBuffer = { buffer: new Int32Array(0), numRows: -1 };
+    }
 
     viewWorker.onmessage = (event: MessageEvent<ComputeViewDoneEvent>) => {
       switch (event.data.type) {

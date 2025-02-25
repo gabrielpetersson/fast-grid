@@ -34,11 +34,11 @@ The most performant DOM-based grid.
 zero copy datatype
 
 ### TODO
-- iphone safari has a very low memory limit - disable multithreading there
-- expand synthetic event-loop to include scrolling & rendering cell contents
+- iphone safari has a very low memory limit - disable multithreading there✅
+- expand synthetic event-loop to include scrolling & rendering cell contents✅
 - can maybe make GC be a bit less expensive by reusing cell classes more..
-- if user zoomed in/out scrollbar will navigate to fast/slow, needs to be relative to the scroll track
-- sort/filter all columns, not just second lol
+- if user zoomed in/out scrollbar will navigate to fast/slow, needs to be relative to the scroll track✅
+- sort/filter all columns, not just second lol✅
 - resize columns
 - custom cells (you can kinda already do this though, just add a new cell class)
 - make sure rows are ordered correctly for text selection
