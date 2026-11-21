@@ -963,7 +963,7 @@ export async function sort<T>(
 
   // The array is already sorted
   if (remaining < 2) {
-    return;
+    return { ok: true };
   }
 
   let runLength = 0;
@@ -971,7 +971,7 @@ export async function sort<T>(
   if (remaining < DEFAULT_MIN_MERGE) {
     runLength = makeAscendingRun(array, lo, hi, compare);
     binaryInsertionSort(array, lo, hi, lo + runLength, compare);
-    return;
+    return { ok: true };
   }
 
   let ts = new TimSort(array, compare);
